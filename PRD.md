@@ -1,12 +1,29 @@
-PRD v1.1 — Shikaku (Desktop Web MVP)
+PRD v1.2 — Shikaku (Desktop Web MVP)
 Document control
 Product: Shikaku
-Version: v1.1 (MVP)
+Version: v1.2 (MVP + implementation status snapshot)
 Platform: Desktop Web (mobile web deferred)
 Hosting: GitHub Pages (static site)
 Canonical puzzle distribution: Static JSON assets in repo
 Telemetry: Not included in MVP
 Inspiration: https://shikakuofthe.day/hard/260210
+0) Current implementation status (as of February 14, 2026)
+Implemented now:
+Desktop web app scaffold is playable end-to-end (Home, Level Select, Puzzle, Solved modal, How to Play, Privacy).
+5 board sizes and 5 difficulty tiers are selectable.
+Catalog currently includes 10 deterministic levels per (difficulty × size), for 250 total puzzle JSON assets.
+Rectangle drawing, right-click erase, Erase toggle, Undo, Redo, Clear All, Restart are implemented.
+Pause/Resume is implemented and freezes timer/board.
+Board uses a clickable overlay (“Press here to begin”) instead of a Start button.
+Live drag-size indicator is implemented (e.g., 3x5 during drag).
+Clue value 1 cells are auto-filled on fresh puzzle loads/restarts.
+Local persistence for in-progress state and top-50 times per puzzle is implemented.
+Partially complete vs target PRD:
+Catalog target is 1,250 canonical puzzles; current build ships 250 sample canonical puzzles.
+Puzzle generation currently uses deterministic heuristics; solver-backed uniqueness/solvability verification is not yet integrated.
+Behavioral deltas from v1.1 spec:
+Rule-invalid rectangles are allowed to be placed (non-overlapping only) and are highlighted with thick red borders.
+Completion still requires full coverage and all rectangles valid.
 1) Product overview
 1.1 Purpose
 Shikaku is a logic puzzle game where players partition a numbered grid into rectangles so that each rectangle contains exactly one number and the number equals the rectangle’s area (width × height). The MVP delivers a polished desktop web experience with deterministic, pre-rendered canonical levels, timing, local progress persistence, and a clean minimal visual design suitable for playing with kids.
@@ -18,7 +35,7 @@ Casual logic-puzzle players on desktop (secondary)
 Desktop-first Shikaku with clean minimal UI and pastel rectangle shading.
 Support 5 board sizes and 5 difficulty tiers.
 Deterministic canonical level catalog: 50 levels per (difficulty × size).
-Timer-based play; board locked until Start.
+Timer-based play; board locked until “Press here to begin”.
 Store top 50 times per level (ms precision) and in-progress state locally.
 Provide dedicated How to Play and Privacy pages.
 2.2 Success criteria
@@ -27,7 +44,7 @@ Rule correctness: Placements and completion detection enforce Shikaku constraint
 Solution constraints:
 Beginner + Intermediate: solvable; multiple solutions allowed
 Easy + Advanced + Insane: solvable; unique solution required
-Usability: Drawing/erasing is discoverable and consistent; invalid actions rejected with clear toast messaging.
+Usability: Drawing/erasing is discoverable and consistent; overlap/out-of-bounds actions are rejected, and rule-invalid rectangles are visually flagged.
 Performance: Smooth drag interaction; fast puzzle load from static JSON assets.
 3) Scope
 3.1 In scope (MVP)
@@ -36,12 +53,15 @@ Board sizes: 6×6, 10×10, 20×20, 25×25, 40×40
 Difficulty levels: Beginner, Easy, Intermediate, Advanced, Insane
 Modes:
 Level Select (1–50) per (difficulty × size)
-Random Level (randomly selects a canonical level 1–50 within the chosen difficulty × size)
+Random Level (randomly selects an available canonical level within the chosen difficulty × size)
 Gameplay features:
 Click+drag rectangle placement
 Right-click erase + Erase tool button
-Undo, Clear All, Restart
-Timer (count-up; starts on Start)
+Undo, Redo, Pause/Resume, Clear All, Restart
+Timer (count-up; starts when “Press here to begin” is clicked)
+Live drag size label while selecting (e.g., 3x5)
+Auto-fill for clue value 1 cells
+Rule-invalid rectangle placement with red border highlight
 Solved modal + Next Level flow
 Persistence:
 In-progress state per puzzle
@@ -55,7 +75,6 @@ Trophy/award system (most levels beaten, fastest times, etc.)
 User profiles / cloud sync
 Race mode (2-player head-to-head)
 Skins/themes
-Pause/blur feature
 Sound
 Color-blind mode
 4) Gameplay rules (functional spec)
@@ -81,7 +100,7 @@ Levels are numbered 1–50 and the numbering is shared across board sizes/diffic
 There is a “Level 1” for each (size × difficulty); total 25 “Level 1” puzzles.
 Canonical puzzle identity key: (difficulty, size, levelNumber)
 5.4 Random Level (MVP definition)
-“Random Level” selects a random integer 1–50 for the chosen (difficulty, size) and loads that canonical puzzle.
+“Random Level” selects a random level from the currently available canonical set for the chosen (difficulty, size) and loads that puzzle.
 No “endless generation” in MVP (keeps content fully canonical and consistent).
 6) Canonical puzzle distribution (determinism)
 6.1 Requirement
@@ -90,7 +109,8 @@ No “endless generation” in MVP (keeps content fully canonical and consistent
 Store puzzles as static JSON assets in the GitHub repo.
 The deployed app fetches these JSON files (cacheable) and renders them.
 6.3 Content volume
-5 sizes × 5 difficulties × 50 levels = 1,250 canonical puzzles
+Target: 5 sizes × 5 difficulties × 50 levels = 1,250 canonical puzzles
+Current build: 5 sizes × 5 difficulties × 10 levels = 250 canonical puzzles
 7) Puzzle generation & validation (offline content pipeline)
 This is not user-facing functionality. It defines how the 1,250 puzzles are created and verified before shipping.
 7.1 Generation approach
@@ -142,20 +162,24 @@ Top bar
 Difficulty, Size, Level #
 Timer display (e.g., 03:12.047)
 Buttons:
-Start (primary)
 Undo
+Redo
+Pause/Resume
 Erase (toggle)
 Clear All
 Restart
 How to Play (shortcut)
 Board
 Renders clue numbers and grid
-Locked until Start:
+Locked until “Press here to begin” overlay is clicked:
 no placement or erasing
 cursor indicates locked state
-After Start:
+After begin:
 timer begins
 interaction enabled
+During pause:
+board is obscured
+timer is frozen until resume
 Solved Modal
 “Solved!” + final time (ms precision)
 Show fastest time (optional) and/or ranking within top-50 (optional)
@@ -168,8 +192,9 @@ Back to Levels
 Draw rectangle via click + drag start cell → end cell.
 On mouse-up:
 Validate immediately.
-If valid: place rectangle + fill with pastel color.
-If invalid: reject placement and show toast.
+If geometry is valid (axis-aligned, in bounds, non-overlapping): place rectangle + fill with pastel color.
+If rule-invalid (clue-count/area mismatch): place rectangle and highlight with thick red border.
+If geometry-invalid: reject placement and show toast.
 9.2 Erasing rectangles (hard requirements)
 Right-click on rectangle removes it (suppress browser context menu over board).
 Erase tool toggle:
@@ -184,7 +209,8 @@ No overlap with existing rectangles
 Contains exactly one clue number cell
 Area equals the clue’s number value
 9.5 Invalid move feedback (hard requirement)
-Reject immediately (no temporary “red” rectangle state).
+Rule-invalid placements remain visible with thick red borders so users can iteratively fix the board.
+Geometry-invalid placements are rejected immediately.
 Toast messages (examples):
 “Rectangle must include exactly one number.”
 “Area must match the number.”
@@ -192,20 +218,24 @@ Toast messages (examples):
 10) Timer and gameplay state
 10.1 Timer rules (hard requirements)
 Timer is count-up
-Starts when player presses Start
+Starts when player clicks “Press here to begin”
+Pause/Resume supported; paused duration is excluded from elapsed timer
 Stops when puzzle solved
 Stored precision: milliseconds
 10.2 Pre-start lock (hard requirement)
-Board must be locked (no actions) until Start is pressed.
+Board must be locked (no actions) until “Press here to begin” is clicked.
 11) Persistence & data model (local-only)
 11.1 Stored items (required)
 Keyed by (difficulty, size, levelNumber):
 A) In-progress state
 started: boolean
+paused: boolean
 elapsed_ms: integer
 rectangles: list of rectangle placements with:
 coordinates (r1, c1, r2, c2)
 color_id (deterministic assignment recommended)
+invalid_reason (null or string, for rule-invalid rectangles)
+auto_seeded (boolean, for auto-placed clue=1 cells)
 Optional: undo stack (recommended if feasible)
 B) Times (top 50)
 Store up to 50 integers time_ms, sorted ascending
@@ -217,7 +247,7 @@ Store time only (no names/labels)
 11.2 Resume behavior
 If in-progress state exists, allow “Resume” flow (Home or Level Select).
 Resuming restores rectangles and elapsed time.
-If started=false, board stays locked until Start.
+If started=false, board stays locked until “Press here to begin”.
 12) Visual design requirements
 Pastel colors
 Clean minimal layout
@@ -245,11 +275,12 @@ No authentication in MVP.
 Local-only data persistence.
 15) MVP acceptance criteria (test checklist)
 Catalog
-All 1,250 puzzles are accessible and load correctly.
-“Random Level” selects within 1–50 for the selected size/difficulty.
+All 1,250 puzzles are accessible and load correctly. (Target)
+Current build ships 250 sample puzzles (levels 1–10 for each size/difficulty).
+“Random Level” selects from available canonical levels for the selected size/difficulty.
 Rules & controls
-Board locked until Start; Start unlocks and timer begins.
-Valid rectangles place; invalid rejected with toast.
+Board locked until “Press here to begin”; click-to-begin unlocks and starts timer.
+Valid rectangles place; rule-invalid rectangles place with red border; overlap/out-of-bounds rejected with toast.
 Overlaps always rejected.
 Exactly one clue per rectangle enforced.
 Area equals clue enforced.
@@ -259,7 +290,7 @@ all rectangles valid.
 Interaction
 Right-click erase removes rectangle; browser context menu does not appear on board.
 Erase toggle works and is clearly indicated.
-Undo/Clear All/Restart behave correctly.
+Undo/Redo/Pause/Clear All/Restart behave correctly.
 Persistence
 In-progress state persists across reload.
 Top-50 times persist, remain sorted, and trim properly.
@@ -271,7 +302,6 @@ Trophy case / award system (most beaten, fastest times, etc.)
 User profiles and cloud sync
 Race mode (2-player head-to-head on same puzzle)
 Skins/themes
-Pause/blur feature
 Mobile web version (touch controls + zoom)
 Optional (recommended) MVP “feedback channel”
 Since there is no telemetry, add a simple “Report a Problem” link in the footer that points to a GitHub Issues/Discussions page for bug reports and level feedback.
