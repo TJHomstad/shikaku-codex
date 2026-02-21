@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "serve": "python3 -m http.server 4173",
+    "serve:api": "node server/index.js",
     "generate:catalog": "node scripts/generate-sample-catalog.mjs"
   }
 }

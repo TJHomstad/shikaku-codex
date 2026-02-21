@@ -4,18 +4,32 @@ This repo now contains an initialized desktop-web Shikaku scaffold based on `PRD
 
 ## Run locally
 
-1. `npm run serve`
-2. Open `http://localhost:4173`
+1. Start API: `npm run serve:api`
+2. Start web app: `npm run serve`
+3. Open `http://localhost:4173`
+4. Optional API override: append `?api_base=http://localhost:8787` to the URL (or set `<meta name="shikaku-api-base" ...>` in `index.html`)
+5. Optional secure cookie mode for HTTPS testing: `COOKIE_SECURE=true npm run serve:api`
+
+## Test users
+
+- `Dad` / `donut`
+- `Mom` / `donut`
+- `Stephen` / `donut`
+- `Lydia` / `donut`
+- `Emmy` / `tacos`
+- `Hazel` / `pizza`
 
 ## Included in this init
 
 - Home, Level Select, Puzzle, Solved modal flow
+- Login flow (first name + password) via local API session cookie
+- Global leaderboard (top 15 per level) with unique per-user best time
 - Dedicated `how-to-play.html` and `privacy.html`
 - Rectangle draw/erase interactions with validation, red invalid-box highlighting, and toasts
 - Board lock until “Press here to begin”, timer, undo/redo, pause, clear all, restart
 - Live drag-size indicator while selecting rectangles
 - Auto-fill for clue value `1` cells on fresh load/restart
-- Local persistence for in-progress puzzle and top 50 times per puzzle
+- Local persistence for in-progress puzzle and local top 50 times per puzzle
 - Sample canonical catalog in `assets/` (Levels 1-10 for each size/difficulty)
 
 ## Catalog notes

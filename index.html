@@ -3,20 +3,54 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="shikaku-api-base" content="" />
     <title>Shikaku</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <header class="site-header">
       <a class="logo" href="index.html">Shikaku</a>
-      <nav>
+      <nav class="top-nav">
         <a href="how-to-play.html">How to Play</a>
         <a href="privacy.html">Privacy</a>
+        <span id="session-user" class="session-user" hidden></span>
+        <button id="logout-btn" type="button" class="nav-btn" hidden>Log Out</button>
       </nav>
     </header>
 
     <main class="shell">
-      <section id="home-screen" class="screen active" aria-labelledby="home-title">
+      <section id="login-screen" class="screen active" aria-labelledby="login-title">
+        <h1 id="login-title">Sign In</h1>
+        <p class="lead">Log in to submit scores to the global leaderboard.</p>
+
+        <form id="login-form" class="login-form">
+          <label for="login-first-name">First Name</label>
+          <input
+            id="login-first-name"
+            name="firstName"
+            type="text"
+            list="known-players"
+            required
+            autocomplete="username"
+          />
+          <datalist id="known-players">
+            <option value="Dad"></option>
+            <option value="Mom"></option>
+            <option value="Stephen"></option>
+            <option value="Lydia"></option>
+            <option value="Emmy"></option>
+            <option value="Hazel"></option>
+          </datalist>
+
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" required autocomplete="current-password" />
+
+          <button id="login-btn" type="submit" class="primary">Log In</button>
+        </form>
+        <p id="login-note" class="note"></p>
+      </section>
+
+      <section id="home-screen" class="screen" aria-labelledby="home-title">
         <div class="home-brand">
           <img
             class="home-brand-logo"
@@ -93,10 +127,10 @@
     <dialog id="solved-modal">
       <h2>Solved!</h2>
       <p id="solved-time">Time: 00:00.000</p>
-      <p id="solved-best">Best: -</p>
-      <p id="solved-rank">Rank: -</p>
+      <p id="solved-best">Your Best: -</p>
+      <p id="solved-rank">Global Rank: -</p>
       <section class="scoreboard" aria-labelledby="high-scores-title">
-        <h3 id="high-scores-title">High Scores</h3>
+        <h3 id="high-scores-title">Global Leaderboard</h3>
         <ol id="solved-leaderboard" class="score-list"></ol>
       </section>
       <div class="action-row wrap">

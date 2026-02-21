@@ -71,6 +71,21 @@ nav a {
   font-weight: 600;
 }
 
+.top-nav {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.session-user {
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.nav-btn {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.85rem;
+}
+
 .shell {
   width: min(1200px, calc(100% - 2rem));
   margin: 0 auto;
@@ -104,6 +119,29 @@ nav a {
   width: 50vw;
   height: auto;
   display: block;
+}
+
+.login-form {
+  margin-top: 1rem;
+  display: grid;
+  gap: 0.65rem;
+  max-width: 360px;
+}
+
+.login-form label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.login-form input {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 0.55rem 0.65rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background: #fff;
+  color: var(--ink);
 }
 
 .panel-grid {
@@ -336,14 +374,26 @@ dialog {
 .score-entry {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-variant-numeric: tabular-nums;
   padding: 0.35rem 0.45rem;
   border-radius: 8px;
+  gap: 0.7rem;
 }
 
 .score-entry.current {
   background: var(--accent-soft);
   font-weight: 700;
+}
+
+.score-entry-main {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.score-entry-time {
+  flex: 0 0 auto;
 }
 
 .score-empty {

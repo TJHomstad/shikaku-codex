@@ -20,14 +20,22 @@ import {
   saveLastPuzzle,
   saveProgress
 } from "./storage.js";
+import { getApiBase, getLeaderboard, login, logout, me, submitScore } from "./api.js";
 import { formatMs, inRect, puzzleStorageId, rectFromPoints } from "./utils.js";
 
 const dom = {
   screens: {
+    login: document.querySelector("#login-screen"),
     home: document.querySelector("#home-screen"),
     levels: document.querySelector("#levels-screen"),
     puzzle: document.querySelector("#puzzle-screen")
   },
+  loginForm: document.querySelector("#login-form"),
+  loginFirstName: document.querySelector("#login-first-name"),
+  loginPassword: document.querySelector("#login-password"),
+  loginNote: document.querySelector("#login-note"),
+  sessionUser: document.querySelector("#session-user"),
+  logoutBtn: document.querySelector("#logout-btn"),
   difficultyOptions: document.querySelector("#difficulty-options"),
   sizeOptions: document.querySelector("#size-options"),
   selectLevelBtn: document.querySelector("#select-level-btn"),
@@ -64,10 +72,11 @@ const dom = {
   toastRoot: document.querySelector("#toast-root")
 };
 
-const MODAL_HIGH_SCORE_LIMIT = 10;
+const GLOBAL_LEADERBOARD_LIMIT = 15;
 
 const state = {
   catalog: null,
+  currentUser: null,
   selectedDifficulty: DIFFICULTIES[0],
   selectedSize: SIZES[0],
   availableLevels: [],
@@ -94,16 +103,29 @@ async function init() {
 
   state.catalog = await loadCatalog();
   updateCatalogNote();
+  await restoreSession();
   refreshContinueButton();
+  syncSessionUi();
 }
 
 function bindEvents() {
+  dom.loginForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void handleLoginSubmit();
+  });
+
+  dom.logoutBtn.addEventListener("click", () => {
+    void handleLogout();
+  });
+
   dom.selectLevelBtn.addEventListener("click", () => {
+    if (!ensureAuthenticated()) return;
     renderLevelsScreen();
     showScreen("levels");
   });
 
   dom.randomLevelBtn.addEventListener("click", () => {
+    if (!ensureAuthenticated()) return;
     const levels = getAvailableLevels(state.catalog, state.selectedDifficulty, state.selectedSize);
     if (!levels.length) {
       toast("No levels available for this selection yet.", "error");
@@ -115,6 +137,7 @@ function bindEvents() {
   });
 
   dom.continueBtn.addEventListener("click", () => {
+    if (!ensureAuthenticated()) return;
     const last = loadLastPuzzle();
     if (!last) return;
     void openPuzzle(last.difficulty, Number(last.size), Number(last.level));
@@ -214,6 +237,91 @@ function bindEvents() {
   });
 }
 
+async function restoreSession() {
+  try {
+    const response = await me();
+    state.currentUser = response.user;
+    showScreen("home");
+    dom.loginNote.textContent = "";
+    return;
+  } catch (error) {
+    state.currentUser = null;
+    showScreen("login");
+
+    if (error.status === 401) {
+      dom.loginNote.textContent = "";
+      return;
+    }
+
+    dom.loginNote.textContent = `Unable to reach login API (${getApiBase()}).`;
+  }
+}
+
+function syncSessionUi() {
+  if (state.currentUser) {
+    dom.sessionUser.hidden = false;
+    dom.logoutBtn.hidden = false;
+    dom.sessionUser.textContent = `Signed in: ${state.currentUser.firstName}`;
+    return;
+  }
+
+  dom.sessionUser.hidden = true;
+  dom.logoutBtn.hidden = true;
+  dom.sessionUser.textContent = "";
+}
+
+function ensureAuthenticated() {
+  if (state.currentUser) return true;
+  showScreen("login");
+  dom.loginNote.textContent = "Please sign in to play and post scores.";
+  return false;
+}
+
+async function handleLoginSubmit() {
+  const firstName = dom.loginFirstName.value.trim();
+  const password = dom.loginPassword.value;
+
+  if (!firstName || !password) {
+    dom.loginNote.textContent = "Enter first name and password.";
+    return;
+  }
+
+  dom.loginNote.textContent = "Signing in...";
+  try {
+    const response = await login(firstName, password);
+    state.currentUser = response.user;
+    dom.loginPassword.value = "";
+    dom.loginNote.textContent = "";
+    syncSessionUi();
+    refreshContinueButton();
+    showScreen("home");
+    toast(`Welcome, ${state.currentUser.firstName}.`);
+  } catch (error) {
+    dom.loginNote.textContent = error.message || "Login failed.";
+  }
+}
+
+async function handleLogout() {
+  saveCurrentProgress();
+  stopTimer();
+  clearInterval(state.autosaveInterval);
+  state.autosaveInterval = null;
+  try {
+    await logout();
+  } catch {
+    // Logout should continue client-side even if request fails.
+  }
+
+  state.currentUser = null;
+  state.current = null;
+  state.model = null;
+  state.puzzle = null;
+  syncSessionUi();
+  refreshContinueButton();
+  showScreen("login");
+  dom.loginNote.textContent = "Signed out.";
+}
+
 function renderHomeOptions() {
   dom.difficultyOptions.innerHTML = "";
   dom.sizeOptions.innerHTML = "";
@@ -244,6 +352,7 @@ function renderHomeOptions() {
 }
 
 function renderLevelsScreen() {
+  if (!state.currentUser) return;
   const { selectedDifficulty, selectedSize, catalog } = state;
   const available = getAvailableLevels(catalog, selectedDifficulty, selectedSize);
   state.availableLevels = available;
@@ -265,7 +374,7 @@ function renderLevelsScreen() {
 
     const storageId = puzzleStorageId(selectedDifficulty, selectedSize, level);
     const bestTimes = loadTimes(storageId);
-    meta.textContent = bestTimes.length ? `Best ${formatMs(bestTimes[0])}` : "Not completed";
+    meta.textContent = bestTimes.length ? `Local best ${formatMs(bestTimes[0])}` : "Not completed";
     button.append(meta);
 
     const availableLevel = available.includes(level);
@@ -295,6 +404,7 @@ function showScreen(name) {
 }
 
 async function openPuzzle(difficulty, size, level) {
+  if (!ensureAuthenticated()) return;
   // Persist the current puzzle before context switch.
   saveCurrentProgress();
   stopTimer();
@@ -498,7 +608,7 @@ function onGlobalMouseUp() {
 
   postBoardMutation(result.valid ? "" : `Invalid rectangle: ${result.reason}`);
   if (state.model.solved) {
-    onSolved();
+    void onSolved();
   }
 }
 
@@ -533,67 +643,73 @@ function postBoardMutation(note = "") {
   dom.puzzleNote.textContent = note;
 }
 
-function onSolved() {
+async function onSolved() {
   if (!state.current) return;
 
   const finalMs = currentElapsedMs();
   stopTimer();
 
-  const storageId = puzzleStorageId(state.current.difficulty, state.current.size, state.current.level);
-  const leaderboard = recordTime(storageId, finalMs);
-  clearProgress(storageId);
+  const levelKey = puzzleStorageId(state.current.difficulty, state.current.size, state.current.level);
+  const localTimes = recordTime(levelKey, finalMs);
+  clearProgress(levelKey);
   refreshContinueButton();
 
   dom.solvedTime.textContent = `Time: ${formatMs(finalMs)}`;
-  dom.solvedBest.textContent = `Best: ${leaderboard.length ? formatMs(leaderboard[0]) : formatMs(finalMs)}`;
-  renderSolvedLeaderboard(leaderboard, finalMs);
+  dom.solvedBest.textContent = `Your Best: ${localTimes.length ? formatMs(localTimes[0]) : formatMs(finalMs)}`;
+  dom.solvedRank.textContent = "Global Rank: loading...";
+  renderGlobalLeaderboard([], null, "Loading leaderboard...");
 
   dom.solvedModal.showModal();
+  try {
+    const response = await submitScore(levelKey, finalMs);
+    const personalBest = Number.isInteger(response.personalBest) ? response.personalBest : finalMs;
+    dom.solvedBest.textContent = `Your Best: ${formatMs(personalBest)}`;
+    dom.solvedRank.textContent = response.rank ? `Global Rank: #${response.rank}` : "Global Rank: -";
+    renderGlobalLeaderboard(response.leaderboard, state.currentUser?.id);
+    return;
+  } catch (error) {
+    toast(error.message || "Unable to submit global score.", "error");
+  }
+
+  try {
+    const leaderboardResponse = await getLeaderboard(levelKey, GLOBAL_LEADERBOARD_LIMIT);
+    dom.solvedRank.textContent = "Global Rank: unavailable";
+    renderGlobalLeaderboard(leaderboardResponse.leaderboard, state.currentUser?.id);
+  } catch {
+    dom.solvedRank.textContent = "Global Rank: unavailable";
+    renderGlobalLeaderboard([], null, "Global leaderboard unavailable.");
+  }
 }
 
-function renderSolvedLeaderboard(leaderboard, finalMs) {
+function renderGlobalLeaderboard(leaderboard, currentUserId, emptyMessage = "No global times yet.") {
   dom.solvedLeaderboard.innerHTML = "";
 
-  if (!leaderboard.length) {
-    dom.solvedRank.textContent = "Rank: -";
+  if (!Array.isArray(leaderboard) || !leaderboard.length) {
     const empty = document.createElement("li");
     empty.className = "score-empty";
-    empty.textContent = "No times yet.";
+    empty.textContent = emptyMessage;
     dom.solvedLeaderboard.append(empty);
     return;
   }
 
-  const finalMsRounded = Math.floor(finalMs);
-  const rankIndex = leaderboard.findIndex((value) => value === finalMsRounded);
-  const rank = rankIndex >= 0 ? rankIndex + 1 : null;
-  dom.solvedRank.textContent = rank ? `Rank: #${rank} of ${leaderboard.length}` : "Rank: -";
-
-  for (const [index, elapsedMs] of leaderboard.slice(0, MODAL_HIGH_SCORE_LIMIT).entries()) {
+  for (const entry of leaderboard.slice(0, GLOBAL_LEADERBOARD_LIMIT)) {
     const item = document.createElement("li");
     item.className = "score-entry";
 
-    if (rank && index + 1 === rank) {
+    if (currentUserId && entry.userId === currentUserId) {
       item.classList.add("current");
     }
 
-    const label = document.createElement("span");
-    label.textContent = `#${index + 1}`;
-    const value = document.createElement("span");
-    value.textContent = formatMs(elapsedMs);
+    const main = document.createElement("span");
+    main.className = "score-entry-main";
+    main.textContent = `#${entry.rank} ${entry.firstName}`;
 
-    item.append(label, value);
+    const time = document.createElement("span");
+    time.className = "score-entry-time";
+    time.textContent = formatMs(entry.completionMs);
+
+    item.append(main, time);
     dom.solvedLeaderboard.append(item);
-  }
-
-  if (rank && rank > MODAL_HIGH_SCORE_LIMIT) {
-    const moreItem = document.createElement("li");
-    moreItem.className = "score-entry current";
-    const label = document.createElement("span");
-    label.textContent = `#${rank}`;
-    const value = document.createElement("span");
-    value.textContent = formatMs(finalMsRounded);
-    moreItem.append(label, value);
-    dom.solvedLeaderboard.append(moreItem);
   }
 }
 
@@ -626,6 +742,11 @@ function saveCurrentProgress() {
 }
 
 function refreshContinueButton() {
+  if (!state.currentUser) {
+    dom.continueBtn.hidden = true;
+    return;
+  }
+
   const last = loadLastPuzzle();
   if (!last) {
     dom.continueBtn.hidden = true;
