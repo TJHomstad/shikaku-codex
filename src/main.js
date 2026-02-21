@@ -78,7 +78,7 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.18";
+const APP_VERSION = "0.67.19";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
