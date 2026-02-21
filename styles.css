@@ -152,7 +152,8 @@ nav a {
 }
 
 .home-points-grid {
-  margin-top: 1.1rem;
+  margin: 1.1rem auto 0;
+  width: min(78%, 760px);
   display: grid;
   gap: 1rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -598,6 +599,7 @@ dialog::backdrop {
   }
 
   .home-points-grid {
+    width: 100%;
     grid-template-columns: 1fr;
   }
 
