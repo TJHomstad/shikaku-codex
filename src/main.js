@@ -81,7 +81,7 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.28";
+const APP_VERSION = "0.67.29";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -409,7 +409,7 @@ async function handleLoginSubmit() {
       void refreshPuzzleLeaderboard();
     }
     renderHomeLeaderboards();
-    void refreshHomeLeaderboards();
+    void refreshHomeLeaderboards(true);
   } catch (error) {
     dom.loginNote.textContent = error.message || "Login failed.";
   }
@@ -431,7 +431,7 @@ async function handleLogout() {
     void refreshPuzzleLeaderboard();
   }
   renderHomeLeaderboards();
-  void refreshHomeLeaderboards();
+  void refreshHomeLeaderboards(true);
   toast("Signed out. Playing as guest.");
 }
 
@@ -531,9 +531,9 @@ function renderHomePointsList(target, entries, { valueKey, emptyMessage }) {
   }
 }
 
-async function refreshHomeLeaderboards() {
+async function refreshHomeLeaderboards(force = false) {
   const now = Date.now();
-  if (now < state.homeLeaderboardNextAttemptAt) {
+  if (!force && now < state.homeLeaderboardNextAttemptAt) {
     return;
   }
 
@@ -1258,7 +1258,7 @@ async function onSolved() {
         personalBestMs: response.personalBest
       });
       updateCachedGlobalBest(levelKey, response.leaderboard);
-      void refreshHomeLeaderboards();
+      void refreshHomeLeaderboards(true);
       return;
     } catch (error) {
       toast(error.message || "Unable to submit global score.", "error");
@@ -1278,7 +1278,7 @@ async function onSolved() {
       personalBestMs: leaderboardResponse.personalBest
     });
     updateCachedGlobalBest(levelKey, leaderboardResponse.leaderboard);
-    void refreshHomeLeaderboards();
+    void refreshHomeLeaderboards(true);
   } catch {
     dom.solvedRank.textContent = "Global Rank: unavailable";
     renderGlobalLeaderboard([], null, "Global leaderboard unavailable.");
