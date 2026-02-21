@@ -224,6 +224,10 @@ button:disabled {
   gap: 0.55rem;
 }
 
+.home-actions {
+  justify-content: center;
+}
+
 .action-row.compact {
   margin-top: 0;
 }
