@@ -162,6 +162,11 @@ nav a {
   margin-top: 0;
 }
 
+.home-points-grid .scoreboard h3,
+.home-points-grid .scoreboard .score-meta {
+  text-align: center;
+}
+
 .panel {
   border: 1px solid var(--line);
   border-radius: 12px;
