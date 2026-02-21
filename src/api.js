@@ -120,3 +120,7 @@ export async function submitScore(levelKey, completionMs) {
 export async function getLeaderboard(levelKey, limit = 15) {
   return request(`/leaderboard/${encodeURIComponent(levelKey)}?limit=${limit}`);
 }
+
+export async function getHomeLeaderboards(limit = 5) {
+  return request(`/leaderboards/home?limit=${limit}`);
+}

@@ -18,7 +18,7 @@ import {
   saveLastPuzzle,
   saveProgress
 } from "./storage.js";
-import { getApiBase, getLeaderboard, login, logout, me, submitScore } from "./api.js";
+import { getApiBase, getHomeLeaderboards, getLeaderboard, login, logout, me, submitScore } from "./api.js";
 import { formatMs, inRect, puzzleStorageId, rectFromPoints } from "./utils.js";
 
 const dom = {
@@ -43,6 +43,8 @@ const dom = {
   continueBtn: document.querySelector("#continue-btn"),
   homeNote: document.querySelector("#home-note"),
   homeVersion: document.querySelector("#home-version"),
+  homeDonutsList: document.querySelector("#home-donuts-list"),
+  homeSprinkleDonutsList: document.querySelector("#home-sprinkle-donuts-list"),
   levelsBackBtn: document.querySelector("#levels-back-btn"),
   levelsSubtitle: document.querySelector("#levels-subtitle"),
   levelsGrid: document.querySelector("#levels-grid"),
@@ -78,7 +80,8 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.24";
+const HOME_LEADERBOARD_LIMIT = 5;
+const APP_VERSION = "0.67.25";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -115,13 +118,19 @@ const state = {
   globalBestCache: new Map(),
   globalBestRequests: new Map(),
   boardLockedToastShown: false,
-  leaderboardRequestId: 0
+  leaderboardRequestId: 0,
+  homeLeaderboards: {
+    donuts: [],
+    sprinkleDonuts: []
+  },
+  homeLeaderboardRequestId: 0
 };
 
 void init();
 
 async function init() {
   renderHomeOptions();
+  renderHomeLeaderboardLoading();
   initInputPreference();
   bindEvents();
   syncInputModeUi();
@@ -132,6 +141,7 @@ async function init() {
   await restoreSession();
   refreshContinueButton();
   syncSessionUi();
+  void refreshHomeLeaderboards();
 }
 
 function bindEvents() {
@@ -364,6 +374,7 @@ function syncSessionUi() {
     dom.sessionUser.hidden = false;
     dom.logoutBtn.hidden = false;
     dom.sessionUser.textContent = `Signed in: ${state.currentUser.firstName}`;
+    renderHomeLeaderboards();
     return;
   }
 
@@ -371,6 +382,7 @@ function syncSessionUi() {
   dom.sessionUser.hidden = true;
   dom.logoutBtn.hidden = true;
   dom.sessionUser.textContent = "";
+  renderHomeLeaderboards();
 }
 
 async function handleLoginSubmit() {
@@ -395,6 +407,8 @@ async function handleLoginSubmit() {
     if (state.current) {
       void refreshPuzzleLeaderboard();
     }
+    renderHomeLeaderboards();
+    void refreshHomeLeaderboards();
   } catch (error) {
     dom.loginNote.textContent = error.message || "Login failed.";
   }
@@ -415,7 +429,90 @@ async function handleLogout() {
   if (state.current) {
     void refreshPuzzleLeaderboard();
   }
+  renderHomeLeaderboards();
+  void refreshHomeLeaderboards();
   toast("Signed out. Playing as guest.");
+}
+
+function renderHomeLeaderboardLoading() {
+  renderHomePointsList(dom.homeDonutsList, [], {
+    valueKey: "donuts",
+    emptyMessage: "Loading donuts..."
+  });
+  renderHomePointsList(dom.homeSprinkleDonutsList, [], {
+    valueKey: "sprinkleDonuts",
+    emptyMessage: "Loading sprinkle donuts..."
+  });
+}
+
+function renderHomeLeaderboards() {
+  renderHomePointsList(dom.homeDonutsList, state.homeLeaderboards.donuts, {
+    valueKey: "donuts",
+    emptyMessage: "No donut scores yet."
+  });
+  renderHomePointsList(dom.homeSprinkleDonutsList, state.homeLeaderboards.sprinkleDonuts, {
+    valueKey: "sprinkleDonuts",
+    emptyMessage: "No sprinkle donut scores yet."
+  });
+}
+
+function renderHomePointsList(target, entries, { valueKey, emptyMessage }) {
+  target.innerHTML = "";
+
+  if (!Array.isArray(entries) || !entries.length) {
+    const empty = document.createElement("li");
+    empty.className = "score-empty";
+    empty.textContent = emptyMessage;
+    target.append(empty);
+    return;
+  }
+
+  for (const entry of entries.slice(0, HOME_LEADERBOARD_LIMIT)) {
+    const item = document.createElement("li");
+    item.className = "score-entry";
+
+    if (state.currentUser && entry.userId === state.currentUser.id) {
+      item.classList.add("current");
+    }
+
+    const main = document.createElement("span");
+    main.className = "score-entry-main";
+    main.textContent = `#${entry.rank} ${entry.firstName}`;
+
+    const points = Number(entry[valueKey]) || 0;
+    const time = document.createElement("span");
+    time.className = `score-entry-time home-points-value ${valueKey === "sprinkleDonuts" ? "sprinkle" : "donut"}`;
+    time.textContent =
+      valueKey === "sprinkleDonuts"
+        ? `${points} sprinkle donut${points === 1 ? "" : "s"}`
+        : `${points} donut${points === 1 ? "" : "s"}`;
+
+    item.append(main, time);
+    target.append(item);
+  }
+}
+
+async function refreshHomeLeaderboards() {
+  const requestId = ++state.homeLeaderboardRequestId;
+  try {
+    const response = await getHomeLeaderboards(HOME_LEADERBOARD_LIMIT);
+    if (requestId !== state.homeLeaderboardRequestId) return;
+    state.homeLeaderboards = {
+      donuts: Array.isArray(response.donuts) ? response.donuts : [],
+      sprinkleDonuts: Array.isArray(response.sprinkleDonuts) ? response.sprinkleDonuts : []
+    };
+    renderHomeLeaderboards();
+  } catch {
+    if (requestId !== state.homeLeaderboardRequestId) return;
+    renderHomePointsList(dom.homeDonutsList, [], {
+      valueKey: "donuts",
+      emptyMessage: "Donut leaderboard unavailable."
+    });
+    renderHomePointsList(dom.homeSprinkleDonutsList, [], {
+      valueKey: "sprinkleDonuts",
+      emptyMessage: "Sprinkle leaderboard unavailable."
+    });
+  }
 }
 
 function renderHomeOptions() {
@@ -1118,6 +1215,7 @@ async function onSolved() {
         personalBestMs: response.personalBest
       });
       updateCachedGlobalBest(levelKey, response.leaderboard);
+      void refreshHomeLeaderboards();
       return;
     } catch (error) {
       toast(error.message || "Unable to submit global score.", "error");
@@ -1137,6 +1235,7 @@ async function onSolved() {
       personalBestMs: leaderboardResponse.personalBest
     });
     updateCachedGlobalBest(levelKey, leaderboardResponse.leaderboard);
+    void refreshHomeLeaderboards();
   } catch {
     dom.solvedRank.textContent = "Global Rank: unavailable";
     renderGlobalLeaderboard([], null, "Global leaderboard unavailable.");

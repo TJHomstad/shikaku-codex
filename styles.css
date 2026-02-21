@@ -151,6 +151,17 @@ nav a {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.home-points-grid {
+  margin-top: 1.1rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.home-points-grid .scoreboard {
+  margin-top: 0;
+}
+
 .panel {
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -501,6 +512,14 @@ dialog {
   flex: 0 0 auto;
 }
 
+.home-points-value.donut {
+  color: #8b5e34;
+}
+
+.home-points-value.sprinkle {
+  color: #a54f4f;
+}
+
 .score-empty {
   color: var(--muted);
 }
@@ -547,6 +566,10 @@ dialog::backdrop {
 
 @media (max-width: 900px) {
   .panel-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-points-grid {
     grid-template-columns: 1fr;
   }
 

@@ -212,6 +212,57 @@ function computeRank(store, levelKey, userId) {
   return idx >= 0 ? idx + 1 : null;
 }
 
+function buildHomeLeaderboards(store, limit = 5) {
+  const donutCounts = new Map(store.users.map((user) => [user.id, 0]));
+  const sprinkleCounts = new Map(store.users.map((user) => [user.id, 0]));
+  const bestByLevel = new Map();
+
+  for (const score of store.scores) {
+    donutCounts.set(score.userId, (donutCounts.get(score.userId) || 0) + 1);
+
+    const currentBest = bestByLevel.get(score.levelKey);
+    if (!currentBest || score.completionMs < currentBest.bestMs) {
+      bestByLevel.set(score.levelKey, {
+        bestMs: score.completionMs,
+        userIds: new Set([score.userId])
+      });
+      continue;
+    }
+    if (score.completionMs === currentBest.bestMs) {
+      currentBest.userIds.add(score.userId);
+    }
+  }
+
+  for (const best of bestByLevel.values()) {
+    for (const userId of best.userIds) {
+      sprinkleCounts.set(userId, (sprinkleCounts.get(userId) || 0) + 1);
+    }
+  }
+
+  const buildEntries = (counts, valueKey) => {
+    const sorted = store.users
+      .map((user) => ({
+        userId: user.id,
+        firstName: user.firstName,
+        value: counts.get(user.id) || 0
+      }))
+      .sort((a, b) => b.value - a.value || a.firstName.localeCompare(b.firstName) || a.userId - b.userId)
+      .slice(0, limit);
+
+    return sorted.map((entry, index) => ({
+      rank: index + 1,
+      userId: entry.userId,
+      firstName: entry.firstName,
+      [valueKey]: entry.value
+    }));
+  };
+
+  return {
+    donuts: buildEntries(donutCounts, "donuts"),
+    sprinkleDonuts: buildEntries(sprinkleCounts, "sprinkleDonuts")
+  };
+}
+
 function findSession(req) {
   const cookies = parseCookies(req.headers.cookie || "");
   const cookieToken = cookies.shikaku_session;
@@ -436,6 +487,17 @@ const server = http.createServer(async (req, res) => {
         personalBest,
         rank,
         leaderboard
+      });
+      return;
+    }
+
+    if (req.method === "GET" && url.pathname === "/leaderboards/home") {
+      const limit = Math.max(1, Math.min(20, Number.parseInt(url.searchParams.get("limit") || "5", 10) || 5));
+      const leaderboards = buildHomeLeaderboards(store, limit);
+      sendJson(req, res, 200, {
+        limit,
+        donuts: leaderboards.donuts,
+        sprinkleDonuts: leaderboards.sprinkleDonuts
       });
       return;
     }
