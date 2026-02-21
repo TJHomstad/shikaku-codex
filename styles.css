@@ -222,6 +222,12 @@ button:disabled {
   color: var(--muted);
 }
 
+.version-note {
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .levels-header {
   display: flex;
   justify-content: space-between;

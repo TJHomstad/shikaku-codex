@@ -1,5 +1,5 @@
 import { DIFFICULTIES, SIZES } from "./constants.js";
-import { catalogSummary, getAvailableLevels, loadCatalog, loadPuzzle } from "./catalog.js";
+import { getAvailableLevels, loadCatalog, loadPuzzle } from "./catalog.js";
 import {
   autoPlaceSingleCellClues,
   clearAll,
@@ -44,6 +44,7 @@ const dom = {
   randomLevelBtn: document.querySelector("#random-level-btn"),
   continueBtn: document.querySelector("#continue-btn"),
   homeNote: document.querySelector("#home-note"),
+  homeVersion: document.querySelector("#home-version"),
   levelsBackBtn: document.querySelector("#levels-back-btn"),
   levelsSubtitle: document.querySelector("#levels-subtitle"),
   levelsGrid: document.querySelector("#levels-grid"),
@@ -78,6 +79,7 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
+const APP_VERSION = "0.67.14";
 
 const state = {
   catalog: { levels: {} },
@@ -394,8 +396,8 @@ function renderLevelsScreen() {
 }
 
 function updateCatalogNote() {
-  const total = catalogSummary(state.catalog);
-  dom.homeNote.textContent = `Catalog loaded: ${total} sample canonical levels. Full 1,250-level set can be dropped into assets later.`;
+  dom.homeNote.textContent = "Catalog loaded: 250 levels.";
+  dom.homeVersion.textContent = `App Version: ${APP_VERSION}`;
 }
 
 function showScreen(name) {
