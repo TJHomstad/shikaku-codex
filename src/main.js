@@ -56,11 +56,15 @@ const dom = {
   solvedModal: document.querySelector("#solved-modal"),
   solvedTime: document.querySelector("#solved-time"),
   solvedBest: document.querySelector("#solved-best"),
+  solvedRank: document.querySelector("#solved-rank"),
+  solvedLeaderboard: document.querySelector("#solved-leaderboard"),
   nextLevelBtn: document.querySelector("#next-level-btn"),
   replayBtn: document.querySelector("#replay-btn"),
   modalLevelsBtn: document.querySelector("#modal-levels-btn"),
   toastRoot: document.querySelector("#toast-root")
 };
+
+const MODAL_HIGH_SCORE_LIMIT = 10;
 
 const state = {
   catalog: null,
@@ -542,8 +546,55 @@ function onSolved() {
 
   dom.solvedTime.textContent = `Time: ${formatMs(finalMs)}`;
   dom.solvedBest.textContent = `Best: ${leaderboard.length ? formatMs(leaderboard[0]) : formatMs(finalMs)}`;
+  renderSolvedLeaderboard(leaderboard, finalMs);
 
   dom.solvedModal.showModal();
+}
+
+function renderSolvedLeaderboard(leaderboard, finalMs) {
+  dom.solvedLeaderboard.innerHTML = "";
+
+  if (!leaderboard.length) {
+    dom.solvedRank.textContent = "Rank: -";
+    const empty = document.createElement("li");
+    empty.className = "score-empty";
+    empty.textContent = "No times yet.";
+    dom.solvedLeaderboard.append(empty);
+    return;
+  }
+
+  const finalMsRounded = Math.floor(finalMs);
+  const rankIndex = leaderboard.findIndex((value) => value === finalMsRounded);
+  const rank = rankIndex >= 0 ? rankIndex + 1 : null;
+  dom.solvedRank.textContent = rank ? `Rank: #${rank} of ${leaderboard.length}` : "Rank: -";
+
+  for (const [index, elapsedMs] of leaderboard.slice(0, MODAL_HIGH_SCORE_LIMIT).entries()) {
+    const item = document.createElement("li");
+    item.className = "score-entry";
+
+    if (rank && index + 1 === rank) {
+      item.classList.add("current");
+    }
+
+    const label = document.createElement("span");
+    label.textContent = `#${index + 1}`;
+    const value = document.createElement("span");
+    value.textContent = formatMs(elapsedMs);
+
+    item.append(label, value);
+    dom.solvedLeaderboard.append(item);
+  }
+
+  if (rank && rank > MODAL_HIGH_SCORE_LIMIT) {
+    const moreItem = document.createElement("li");
+    moreItem.className = "score-entry current";
+    const label = document.createElement("span");
+    label.textContent = `#${rank}`;
+    const value = document.createElement("span");
+    value.textContent = formatMs(finalMsRounded);
+    moreItem.append(label, value);
+    dom.solvedLeaderboard.append(moreItem);
+  }
 }
 
 function saveCurrentProgress() {

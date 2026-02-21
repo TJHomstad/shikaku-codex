@@ -312,6 +312,44 @@ dialog {
   width: min(440px, calc(100% - 2rem));
 }
 
+.scoreboard {
+  margin-top: 0.75rem;
+  padding: 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fffcf6;
+}
+
+.scoreboard h3 {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.score-list {
+  margin: 0.6rem 0 0;
+  padding-left: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.score-entry {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+  padding: 0.35rem 0.45rem;
+  border-radius: 8px;
+}
+
+.score-entry.current {
+  background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.score-empty {
+  color: var(--muted);
+}
+
 dialog::backdrop {
   background: rgba(30, 30, 30, 0.35);
 }
