@@ -5,12 +5,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, "data");
-const DATA_FILE = path.join(DATA_DIR, "store.json");
+const DATA_DIR = process.env.DATA_DIR || path.join(__dirname, "data");
+const DATA_FILE = process.env.DATA_FILE || path.join(DATA_DIR, "store.json");
 
 const PORT = Number.parseInt(process.env.PORT || "8787", 10);
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
+const COOKIE_SAME_SITE = process.env.COOKIE_SAME_SITE || "Lax";
 
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:4173",
@@ -86,7 +87,7 @@ function buildCookie(name, value, options = {}) {
   const parts = [`${encodeURIComponent(name)}=${encodeURIComponent(value)}`];
   if (options.maxAge !== undefined) parts.push(`Max-Age=${options.maxAge}`);
   parts.push(`Path=${options.path || "/"}`);
-  parts.push(`SameSite=${options.sameSite || "Lax"}`);
+  parts.push(`SameSite=${options.sameSite || COOKIE_SAME_SITE}`);
   if (options.httpOnly !== false) parts.push("HttpOnly");
   if (options.secure) parts.push("Secure");
   return parts.join("; ");

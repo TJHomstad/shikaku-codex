@@ -10,6 +10,24 @@ This repo now contains an initialized desktop-web Shikaku scaffold based on `PRD
 4. Optional API override: append `?api_base=http://localhost:8787` to the URL (or set `<meta name="shikaku-api-base" ...>` in `index.html`)
 5. Optional secure cookie mode for HTTPS testing: `COOKIE_SECURE=true npm run serve:api`
 
+## Deploy API on Railway
+
+1. In Railway, create a new project from this GitHub repo.
+2. Deploy the root service (Railway uses `railway.json` and runs `npm start`).
+3. Add a Railway volume and mount it at `/data`.
+4. Set environment variables:
+- `DATA_DIR=/data`
+- `COOKIE_SECURE=true`
+- `COOKIE_SAME_SITE=Lax`
+- `CORS_ORIGINS=https://derpydonut.com,https://www.derpydonut.com,http://localhost:4173,http://127.0.0.1:4173`
+5. Add custom domain `api.derpydonut.com` to the Railway service.
+6. In DNS, point `api.derpydonut.com` to Railway using the target Railway gives you.
+
+Notes:
+- The frontend defaults to `https://api.derpydonut.com` when loaded on `derpydonut.com` or `www.derpydonut.com`.
+- If you test against the temporary `*.up.railway.app` URL, use `COOKIE_SAME_SITE=None` and keep `COOKIE_SECURE=true`.
+- Example env file: `server/.env.example`.
+
 ## Test users
 
 - `Dad` / `donut`

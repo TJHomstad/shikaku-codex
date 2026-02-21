@@ -26,6 +26,10 @@ function resolveApiBase() {
     return "http://localhost:8787";
   }
 
+  if (window.location.hostname === "derpydonut.com" || window.location.hostname === "www.derpydonut.com") {
+    return "https://api.derpydonut.com";
+  }
+
   return window.location.origin;
 }
 
