@@ -82,13 +82,10 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.16";
+const APP_VERSION = "0.67.17";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
-const DOUBLE_TAP_WINDOW_MS = 280;
-const LONG_PRESS_MS = 420;
-const LONG_PRESS_MOVE_TOLERANCE_PX = 8;
 
 const state = {
   catalog: { levels: {} },
@@ -109,8 +106,8 @@ const state = {
   autosaveInterval: null,
   drag: null,
   touchAnchor: null,
+  touchDeleteCandidate: null,
   touchState: null,
-  touchLastTap: null,
   touchPoints: new Map(),
   touchGesture: null,
   boardZoom: 1,
@@ -247,7 +244,7 @@ function bindEvents() {
     state.inputPreference = next;
     localStorage.setItem(INPUT_MODE_STORAGE_KEY, next);
     state.touchAnchor = null;
-    state.touchLastTap = null;
+    state.touchDeleteCandidate = null;
     state.touchPoints.clear();
     state.touchGesture = null;
     state.drag = null;
@@ -346,8 +343,8 @@ function setActivePointer(pointerType) {
   if (nextEffectiveMode === prevEffectiveMode) return;
 
   state.touchAnchor = null;
+  state.touchDeleteCandidate = null;
   state.drag = null;
-  state.touchLastTap = null;
   state.touchPoints.clear();
   state.touchGesture = null;
   cancelTouchState();
@@ -537,7 +534,7 @@ async function openPuzzle(difficulty, size, level) {
     state.eraseMode = false;
     state.drag = null;
     state.touchAnchor = null;
-    state.touchLastTap = null;
+    state.touchDeleteCandidate = null;
     state.touchPoints.clear();
     state.touchGesture = null;
     cancelTouchState();
@@ -587,7 +584,7 @@ function restartPuzzle() {
   state.eraseMode = false;
   state.drag = null;
   state.touchAnchor = null;
-  state.touchLastTap = null;
+  state.touchDeleteCandidate = null;
   state.touchPoints.clear();
   state.touchGesture = null;
   cancelTouchState();
@@ -709,6 +706,7 @@ function onBoardPointerDown(event) {
   }
 
   state.touchAnchor = null;
+  state.touchDeleteCandidate = null;
   state.drag = {
     pointerId: event.pointerId,
     startR: r,
@@ -780,19 +778,7 @@ function onTouchPointerDown(event, r, c) {
     startY: event.clientY,
     startR: r,
     startC: c,
-    moved: false,
-    longPressTriggered: false,
-    longPressTimer: window.setTimeout(() => {
-      if (!state.touchState) return;
-      if (state.touchState.pointerId !== event.pointerId) return;
-      if (state.touchState.moved || state.touchGesture) return;
-      state.touchState.longPressTriggered = true;
-      state.touchAnchor = null;
-      if (!eraseAtCoordinates(r, c, false)) {
-        toast("Long press a filled rectangle to erase.");
-      }
-      renderBoard();
-    }, LONG_PRESS_MS)
+    moved: false
   };
 }
 
@@ -812,9 +798,6 @@ function onTouchPointerMove(event) {
   if (distance > TAP_MOVE_TOLERANCE_PX) {
     state.touchState.moved = true;
   }
-  if (distance > LONG_PRESS_MOVE_TOLERANCE_PX) {
-    clearTouchLongPressTimer();
-  }
 }
 
 function onTouchPointerUp(event) {
@@ -827,7 +810,7 @@ function onTouchPointerUp(event) {
 
   const interaction = state.touchState;
   cancelTouchState();
-  if (hadGesture || interaction.moved || interaction.longPressTriggered) return;
+  if (hadGesture || interaction.moved) return;
 
   const cell = getCellFromPointerEvent(event);
   const r = cell ? Number(cell.dataset.r) : interaction.startR;
@@ -841,36 +824,31 @@ function handleTouchTap(r, c) {
 
   if (state.eraseMode) {
     eraseAtCoordinates(r, c);
-    state.touchLastTap = null;
     state.touchAnchor = null;
+    state.touchDeleteCandidate = null;
     return;
   }
 
   const hasPlacement = Boolean(state.model.occupancy[r]?.[c]);
-  const now = Date.now();
-  const sameAsAnchor = Boolean(state.touchAnchor) && state.touchAnchor.r === r && state.touchAnchor.c === c;
-  const isDoubleTap =
-    hasPlacement &&
-    state.touchLastTap &&
-    now - state.touchLastTap.time <= DOUBLE_TAP_WINDOW_MS &&
-    state.touchLastTap.r === r &&
-    state.touchLastTap.c === c &&
-    (!state.touchAnchor || sameAsAnchor);
-
-  if (isDoubleTap) {
+  const sameAsDeleteCandidate =
+    Boolean(state.touchDeleteCandidate) && state.touchDeleteCandidate.r === r && state.touchDeleteCandidate.c === c;
+  if (hasPlacement && sameAsDeleteCandidate) {
     eraseAtCoordinates(r, c);
-    state.touchLastTap = null;
     state.touchAnchor = null;
+    state.touchDeleteCandidate = null;
+    renderBoard();
     return;
   }
 
-  if (hasPlacement && !state.touchAnchor) {
-    state.touchLastTap = { r, c, time: now };
-    dom.puzzleNote.textContent = "Double tap a filled rectangle to erase it.";
+  if (hasPlacement) {
+    state.touchAnchor = null;
+    state.touchDeleteCandidate = { r, c };
+    dom.puzzleNote.textContent = "Tap the same filled cell again to erase its rectangle.";
+    renderBoard();
     return;
   }
 
-  state.touchLastTap = { r, c, time: now };
+  state.touchDeleteCandidate = null;
   if (!state.touchAnchor) {
     state.touchAnchor = { r, c };
     dom.puzzleNote.textContent = `Start corner selected (${r + 1}, ${c + 1}).`;
@@ -887,6 +865,7 @@ function handleTouchTap(r, c) {
 
   const rect = rectFromPoints(state.touchAnchor.r, state.touchAnchor.c, r, c);
   state.touchAnchor = null;
+  state.touchDeleteCandidate = null;
   applyPlacement(rect);
 }
 
@@ -900,6 +879,7 @@ function beginTouchGesture() {
 
   cancelTouchState();
   state.touchAnchor = null;
+  state.touchDeleteCandidate = null;
   state.drag = null;
   state.touchGesture = {
     prevCenter: metrics.center,
@@ -955,14 +935,7 @@ function getTouchMetrics() {
   };
 }
 
-function clearTouchLongPressTimer() {
-  if (!state.touchState?.longPressTimer) return;
-  clearTimeout(state.touchState.longPressTimer);
-  state.touchState.longPressTimer = null;
-}
-
 function cancelTouchState() {
-  clearTouchLongPressTimer();
   state.touchState = null;
 }
 
@@ -1310,8 +1283,11 @@ function renderBoard() {
 
       const inDraft = Boolean(state.drag?.rect) && inRect(state.drag.rect, r, c);
       const isTouchAnchor = Boolean(state.touchAnchor) && state.touchAnchor.r === r && state.touchAnchor.c === c;
+      const isDeleteCandidate =
+        Boolean(state.touchDeleteCandidate) && state.touchDeleteCandidate.r === r && state.touchDeleteCandidate.c === c;
       cell.classList.toggle("draft", inDraft);
       cell.classList.toggle("touch-anchor", isTouchAnchor);
+      cell.classList.toggle("touch-delete-candidate", isDeleteCandidate);
     }
   }
 
