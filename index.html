@@ -118,12 +118,22 @@
           <a class="inline-link" href="how-to-play.html">How to Play</a>
         </div>
 
-        <p id="puzzle-note" class="note"></p>
+        <div class="puzzle-layout">
+          <div id="puzzle-play-area" class="puzzle-play-area">
+            <p id="puzzle-note" class="note"></p>
 
-        <div id="board-wrap" class="board-wrap locked" aria-live="polite">
-          <div id="board" class="board" role="grid" aria-label="Shikaku puzzle board"></div>
-          <div id="drag-size-indicator" class="drag-size-indicator" hidden></div>
-          <button id="board-overlay" class="lock-overlay" type="button">Press here to begin</button>
+            <div id="board-wrap" class="board-wrap locked" aria-live="polite">
+              <div id="board" class="board" role="grid" aria-label="Shikaku puzzle board"></div>
+              <div id="drag-size-indicator" class="drag-size-indicator" hidden></div>
+              <button id="board-overlay" class="lock-overlay" type="button">Press here to begin</button>
+            </div>
+          </div>
+
+          <aside class="scoreboard puzzle-scoreboard" aria-labelledby="puzzle-high-scores-title">
+            <h3 id="puzzle-high-scores-title">Level Leaderboard</h3>
+            <p id="puzzle-leaderboard-meta" class="score-meta"></p>
+            <ol id="puzzle-leaderboard" class="score-list"></ol>
+          </aside>
         </div>
       </section>
     </main>

@@ -266,8 +266,20 @@ button:disabled {
   font-weight: 700;
 }
 
+.puzzle-layout {
+  margin-top: 0.8rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  align-items: start;
+}
+
+.puzzle-play-area {
+  min-width: 0;
+}
+
 .board-wrap {
-  margin-top: 1rem;
+  margin-top: 0.8rem;
   position: relative;
   display: inline-block;
   border: 1px solid var(--line);
@@ -363,12 +375,22 @@ dialog {
   font-size: 0.95rem;
 }
 
+.score-meta {
+  margin-top: 0.45rem;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
 .score-list {
   margin: 0.6rem 0 0;
   padding-left: 0;
   list-style: none;
   display: grid;
   gap: 0.35rem;
+}
+
+.puzzle-scoreboard {
+  margin-top: 0;
 }
 
 .score-entry {
@@ -454,5 +476,9 @@ dialog::backdrop {
   .puzzle-topbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .puzzle-layout {
+    grid-template-columns: 1fr;
   }
 }

@@ -48,6 +48,7 @@ const dom = {
   levelsSubtitle: document.querySelector("#levels-subtitle"),
   levelsGrid: document.querySelector("#levels-grid"),
   puzzleNote: document.querySelector("#puzzle-note"),
+  puzzlePlayArea: document.querySelector("#puzzle-play-area"),
   metaDifficulty: document.querySelector("#meta-difficulty"),
   metaSize: document.querySelector("#meta-size"),
   metaLevel: document.querySelector("#meta-level"),
@@ -68,6 +69,8 @@ const dom = {
   solvedBest: document.querySelector("#solved-best"),
   solvedRank: document.querySelector("#solved-rank"),
   solvedLeaderboard: document.querySelector("#solved-leaderboard"),
+  puzzleLeaderboard: document.querySelector("#puzzle-leaderboard"),
+  puzzleLeaderboardMeta: document.querySelector("#puzzle-leaderboard-meta"),
   nextLevelBtn: document.querySelector("#next-level-btn"),
   replayBtn: document.querySelector("#replay-btn"),
   modalLevelsBtn: document.querySelector("#modal-levels-btn"),
@@ -94,7 +97,8 @@ const state = {
   timerInterval: null,
   autosaveInterval: null,
   drag: null,
-  boardLockedToastShown: false
+  boardLockedToastShown: false,
+  leaderboardRequestId: 0
 };
 
 void init();
@@ -239,6 +243,7 @@ function bindEvents() {
   dom.board.addEventListener("mouseover", onBoardMouseOver);
   dom.board.addEventListener("contextmenu", onBoardContextMenu);
   window.addEventListener("mouseup", onGlobalMouseUp);
+  window.addEventListener("resize", onWindowResize);
 
   window.addEventListener("beforeunload", () => {
     saveCurrentProgress();
@@ -293,6 +298,9 @@ async function handleLoginSubmit() {
     refreshContinueButton();
     showScreen("home");
     toast(`Welcome, ${state.currentUser.firstName}.`);
+    if (state.current) {
+      void refreshPuzzleLeaderboard();
+    }
   } catch (error) {
     dom.loginNote.textContent = error.message || "Login failed.";
   }
@@ -309,6 +317,9 @@ async function handleLogout() {
   syncSessionUi();
   if (dom.screens.login.classList.contains("active")) {
     showScreen("home");
+  }
+  if (state.current) {
+    void refreshPuzzleLeaderboard();
   }
   toast("Signed out. Playing as guest.");
 }
@@ -432,6 +443,8 @@ async function openPuzzle(difficulty, size, level) {
 
     showScreen("puzzle");
     dom.puzzleNote.textContent = "";
+    renderPuzzleLeaderboard([], null, "Loading leaderboard...");
+    void refreshPuzzleLeaderboard();
 
     clearInterval(state.autosaveInterval);
     state.autosaveInterval = setInterval(() => {
@@ -465,6 +478,7 @@ function syncPuzzleHeader() {
   dom.metaSize.textContent = `${state.current.size}x${state.current.size}`;
   dom.metaLevel.textContent = `Level ${state.current.level}`;
   dom.timerDisplay.textContent = formatMs(currentElapsedMs());
+  dom.puzzleLeaderboardMeta.textContent = `Top ${GLOBAL_LEADERBOARD_LIMIT} times for ${state.current.difficulty} ${state.current.size}x${state.current.size} Level ${state.current.level}`;
 }
 
 function syncPuzzleControls() {
@@ -647,6 +661,7 @@ async function onSolved() {
   dom.solvedBest.textContent = `Your Best: ${localTimes.length ? formatMs(localTimes[0]) : formatMs(finalMs)}`;
   dom.solvedRank.textContent = state.currentUser ? "Global Rank: loading..." : "Global Rank: sign in to submit.";
   renderGlobalLeaderboard([], null, "Loading leaderboard...");
+  renderPuzzleLeaderboard([], null, "Loading leaderboard...");
 
   dom.solvedModal.showModal();
   if (state.currentUser) {
@@ -656,6 +671,7 @@ async function onSolved() {
       dom.solvedBest.textContent = `Your Best: ${formatMs(personalBest)}`;
       dom.solvedRank.textContent = response.rank ? `Global Rank: #${response.rank}` : "Global Rank: -";
       renderGlobalLeaderboard(response.leaderboard, state.currentUser.id);
+      renderPuzzleLeaderboard(response.leaderboard, state.currentUser.id);
       return;
     } catch (error) {
       toast(error.message || "Unable to submit global score.", "error");
@@ -670,20 +686,30 @@ async function onSolved() {
       dom.solvedRank.textContent = "Global Rank: unavailable";
     }
     renderGlobalLeaderboard(leaderboardResponse.leaderboard, state.currentUser?.id);
+    renderPuzzleLeaderboard(leaderboardResponse.leaderboard, state.currentUser?.id);
   } catch {
     dom.solvedRank.textContent = "Global Rank: unavailable";
     renderGlobalLeaderboard([], null, "Global leaderboard unavailable.");
+    renderPuzzleLeaderboard([], null, "Global leaderboard unavailable.");
   }
 }
 
 function renderGlobalLeaderboard(leaderboard, currentUserId, emptyMessage = "No global times yet.") {
-  dom.solvedLeaderboard.innerHTML = "";
+  renderLeaderboardList(dom.solvedLeaderboard, leaderboard, currentUserId, emptyMessage);
+}
+
+function renderPuzzleLeaderboard(leaderboard, currentUserId, emptyMessage = "No global times yet.") {
+  renderLeaderboardList(dom.puzzleLeaderboard, leaderboard, currentUserId, emptyMessage);
+}
+
+function renderLeaderboardList(target, leaderboard, currentUserId, emptyMessage = "No global times yet.") {
+  target.innerHTML = "";
 
   if (!Array.isArray(leaderboard) || !leaderboard.length) {
     const empty = document.createElement("li");
     empty.className = "score-empty";
     empty.textContent = emptyMessage;
-    dom.solvedLeaderboard.append(empty);
+    target.append(empty);
     return;
   }
 
@@ -704,7 +730,23 @@ function renderGlobalLeaderboard(leaderboard, currentUserId, emptyMessage = "No 
     time.textContent = formatMs(entry.completionMs);
 
     item.append(main, time);
-    dom.solvedLeaderboard.append(item);
+    target.append(item);
+  }
+}
+
+async function refreshPuzzleLeaderboard() {
+  if (!state.current) return;
+
+  const requestId = ++state.leaderboardRequestId;
+  const levelKey = puzzleStorageId(state.current.difficulty, state.current.size, state.current.level);
+
+  try {
+    const response = await getLeaderboard(levelKey, GLOBAL_LEADERBOARD_LIMIT);
+    if (requestId !== state.leaderboardRequestId) return;
+    renderPuzzleLeaderboard(response.leaderboard, state.currentUser?.id);
+  } catch {
+    if (requestId !== state.leaderboardRequestId) return;
+    renderPuzzleLeaderboard([], null, "Global leaderboard unavailable.");
   }
 }
 
@@ -765,6 +807,13 @@ function canMutateBoard() {
   return true;
 }
 
+function onWindowResize() {
+  if (!state.model) return;
+  if (!dom.screens.puzzle.classList.contains("active")) return;
+  buildBoard();
+  renderBoard();
+}
+
 function buildBoard() {
   if (!state.model) return;
 
@@ -773,7 +822,8 @@ function buildBoard() {
   dom.board.style.gridTemplateColumns = `repeat(${size}, var(--cell-size, 28px))`;
   dom.board.style.gridTemplateRows = `repeat(${size}, var(--cell-size, 28px))`;
 
-  const availableWidth = Math.max(280, Math.min(window.innerWidth - 120, 860));
+  const playAreaWidth = dom.puzzlePlayArea?.clientWidth || window.innerWidth;
+  const availableWidth = Math.max(220, Math.min(playAreaWidth - 20, 860));
   const cellSize = Math.max(18, Math.floor(availableWidth / size));
   dom.board.style.setProperty("--cell-size", `${cellSize}px`);
 
