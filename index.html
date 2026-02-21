@@ -13,15 +13,16 @@
       <nav class="top-nav">
         <a href="how-to-play.html">How to Play</a>
         <a href="privacy.html">Privacy</a>
+        <button id="nav-login-btn" type="button" class="nav-btn">Log In</button>
         <span id="session-user" class="session-user" hidden></span>
         <button id="logout-btn" type="button" class="nav-btn" hidden>Log Out</button>
       </nav>
     </header>
 
     <main class="shell">
-      <section id="login-screen" class="screen active" aria-labelledby="login-title">
+      <section id="login-screen" class="screen" aria-labelledby="login-title">
         <h1 id="login-title">Sign In</h1>
-        <p class="lead">Log in to submit scores to the global leaderboard.</p>
+        <p class="lead">Sign in to submit scores to the global leaderboard.</p>
 
         <form id="login-form" class="login-form">
           <label for="login-first-name">First Name</label>
@@ -47,10 +48,13 @@
 
           <button id="login-btn" type="submit" class="primary">Log In</button>
         </form>
+        <div class="action-row">
+          <button id="guest-play-btn" type="button">Continue as Guest</button>
+        </div>
         <p id="login-note" class="note"></p>
       </section>
 
-      <section id="home-screen" class="screen" aria-labelledby="home-title">
+      <section id="home-screen" class="screen active" aria-labelledby="home-title">
         <div class="home-brand">
           <img
             class="home-brand-logo"

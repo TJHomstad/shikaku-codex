@@ -40,7 +40,7 @@ Notes:
 ## Included in this init
 
 - Home, Level Select, Puzzle, Solved modal flow
-- Login flow (first name + password) via local API session cookie
+- Guest-first play flow with optional login (first name + password) via local API session cookie
 - Global leaderboard (top 15 per level) with unique per-user best time
 - Dedicated `how-to-play.html` and `privacy.html`
 - Rectangle draw/erase interactions with validation, red invalid-box highlighting, and toasts

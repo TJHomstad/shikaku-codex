@@ -30,7 +30,9 @@ const dom = {
     levels: document.querySelector("#levels-screen"),
     puzzle: document.querySelector("#puzzle-screen")
   },
+  navLoginBtn: document.querySelector("#nav-login-btn"),
   loginForm: document.querySelector("#login-form"),
+  guestPlayBtn: document.querySelector("#guest-play-btn"),
   loginFirstName: document.querySelector("#login-first-name"),
   loginPassword: document.querySelector("#login-password"),
   loginNote: document.querySelector("#login-note"),
@@ -75,7 +77,7 @@ const dom = {
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 
 const state = {
-  catalog: null,
+  catalog: { levels: {} },
   currentUser: null,
   selectedDifficulty: DIFFICULTIES[0],
   selectedSize: SIZES[0],
@@ -109,9 +111,18 @@ async function init() {
 }
 
 function bindEvents() {
+  dom.navLoginBtn.addEventListener("click", () => {
+    dom.loginNote.textContent = "";
+    showScreen("login");
+  });
+
   dom.loginForm.addEventListener("submit", (event) => {
     event.preventDefault();
     void handleLoginSubmit();
+  });
+
+  dom.guestPlayBtn.addEventListener("click", () => {
+    showScreen("home");
   });
 
   dom.logoutBtn.addEventListener("click", () => {
@@ -119,13 +130,11 @@ function bindEvents() {
   });
 
   dom.selectLevelBtn.addEventListener("click", () => {
-    if (!ensureAuthenticated()) return;
     renderLevelsScreen();
     showScreen("levels");
   });
 
   dom.randomLevelBtn.addEventListener("click", () => {
-    if (!ensureAuthenticated()) return;
     const levels = getAvailableLevels(state.catalog, state.selectedDifficulty, state.selectedSize);
     if (!levels.length) {
       toast("No levels available for this selection yet.", "error");
@@ -137,7 +146,6 @@ function bindEvents() {
   });
 
   dom.continueBtn.addEventListener("click", () => {
-    if (!ensureAuthenticated()) return;
     const last = loadLastPuzzle();
     if (!last) return;
     void openPuzzle(last.difficulty, Number(last.size), Number(last.level));
@@ -241,40 +249,29 @@ async function restoreSession() {
   try {
     const response = await me();
     state.currentUser = response.user;
-    showScreen("home");
     dom.loginNote.textContent = "";
     return;
   } catch (error) {
     state.currentUser = null;
-    showScreen("login");
-
-    if (error.status === 401) {
-      dom.loginNote.textContent = "";
-      return;
+    if (error.status !== 401) {
+      dom.loginNote.textContent = `Unable to reach login API (${getApiBase()}).`;
     }
-
-    dom.loginNote.textContent = `Unable to reach login API (${getApiBase()}).`;
   }
 }
 
 function syncSessionUi() {
   if (state.currentUser) {
+    dom.navLoginBtn.hidden = true;
     dom.sessionUser.hidden = false;
     dom.logoutBtn.hidden = false;
     dom.sessionUser.textContent = `Signed in: ${state.currentUser.firstName}`;
     return;
   }
 
+  dom.navLoginBtn.hidden = false;
   dom.sessionUser.hidden = true;
   dom.logoutBtn.hidden = true;
   dom.sessionUser.textContent = "";
-}
-
-function ensureAuthenticated() {
-  if (state.currentUser) return true;
-  showScreen("login");
-  dom.loginNote.textContent = "Please sign in to play and post scores.";
-  return false;
 }
 
 async function handleLoginSubmit() {
@@ -302,10 +299,6 @@ async function handleLoginSubmit() {
 }
 
 async function handleLogout() {
-  saveCurrentProgress();
-  stopTimer();
-  clearInterval(state.autosaveInterval);
-  state.autosaveInterval = null;
   try {
     await logout();
   } catch {
@@ -313,13 +306,11 @@ async function handleLogout() {
   }
 
   state.currentUser = null;
-  state.current = null;
-  state.model = null;
-  state.puzzle = null;
   syncSessionUi();
-  refreshContinueButton();
-  showScreen("login");
-  dom.loginNote.textContent = "Signed out.";
+  if (dom.screens.login.classList.contains("active")) {
+    showScreen("home");
+  }
+  toast("Signed out. Playing as guest.");
 }
 
 function renderHomeOptions() {
@@ -352,7 +343,6 @@ function renderHomeOptions() {
 }
 
 function renderLevelsScreen() {
-  if (!state.currentUser) return;
   const { selectedDifficulty, selectedSize, catalog } = state;
   const available = getAvailableLevels(catalog, selectedDifficulty, selectedSize);
   state.availableLevels = available;
@@ -404,7 +394,6 @@ function showScreen(name) {
 }
 
 async function openPuzzle(difficulty, size, level) {
-  if (!ensureAuthenticated()) return;
   // Persist the current puzzle before context switch.
   saveCurrentProgress();
   stopTimer();
@@ -656,24 +645,30 @@ async function onSolved() {
 
   dom.solvedTime.textContent = `Time: ${formatMs(finalMs)}`;
   dom.solvedBest.textContent = `Your Best: ${localTimes.length ? formatMs(localTimes[0]) : formatMs(finalMs)}`;
-  dom.solvedRank.textContent = "Global Rank: loading...";
+  dom.solvedRank.textContent = state.currentUser ? "Global Rank: loading..." : "Global Rank: sign in to submit.";
   renderGlobalLeaderboard([], null, "Loading leaderboard...");
 
   dom.solvedModal.showModal();
-  try {
-    const response = await submitScore(levelKey, finalMs);
-    const personalBest = Number.isInteger(response.personalBest) ? response.personalBest : finalMs;
-    dom.solvedBest.textContent = `Your Best: ${formatMs(personalBest)}`;
-    dom.solvedRank.textContent = response.rank ? `Global Rank: #${response.rank}` : "Global Rank: -";
-    renderGlobalLeaderboard(response.leaderboard, state.currentUser?.id);
-    return;
-  } catch (error) {
-    toast(error.message || "Unable to submit global score.", "error");
+  if (state.currentUser) {
+    try {
+      const response = await submitScore(levelKey, finalMs);
+      const personalBest = Number.isInteger(response.personalBest) ? response.personalBest : finalMs;
+      dom.solvedBest.textContent = `Your Best: ${formatMs(personalBest)}`;
+      dom.solvedRank.textContent = response.rank ? `Global Rank: #${response.rank}` : "Global Rank: -";
+      renderGlobalLeaderboard(response.leaderboard, state.currentUser.id);
+      return;
+    } catch (error) {
+      toast(error.message || "Unable to submit global score.", "error");
+    }
   }
 
   try {
     const leaderboardResponse = await getLeaderboard(levelKey, GLOBAL_LEADERBOARD_LIMIT);
-    dom.solvedRank.textContent = "Global Rank: unavailable";
+    if (!state.currentUser) {
+      dom.solvedRank.textContent = "Global Rank: sign in to submit.";
+    } else {
+      dom.solvedRank.textContent = "Global Rank: unavailable";
+    }
     renderGlobalLeaderboard(leaderboardResponse.leaderboard, state.currentUser?.id);
   } catch {
     dom.solvedRank.textContent = "Global Rank: unavailable";
@@ -742,11 +737,6 @@ function saveCurrentProgress() {
 }
 
 function refreshContinueButton() {
-  if (!state.currentUser) {
-    dom.continueBtn.hidden = true;
-    return;
-  }
-
   const last = loadLastPuzzle();
   if (!last) {
     dom.continueBtn.hidden = true;
