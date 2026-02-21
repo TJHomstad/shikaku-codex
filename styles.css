@@ -94,6 +94,18 @@ nav a {
   color: var(--muted);
 }
 
+.home-brand {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.9rem;
+}
+
+.home-brand-logo {
+  width: min(280px, 65vw);
+  height: auto;
+  display: block;
+}
+
 .panel-grid {
   margin-top: 1.5rem;
   display: grid;
