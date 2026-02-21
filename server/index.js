@@ -190,8 +190,16 @@ function sanitizeUser(user) {
   return { id: user.id, firstName: user.firstName };
 }
 
+function userIdKey(value) {
+  return String(value);
+}
+
+function idsEqual(left, right) {
+  return userIdKey(left) === userIdKey(right);
+}
+
 function toLeaderboardEntries(store, levelKey, limit = 15) {
-  const usersById = new Map(store.users.map((user) => [user.id, user]));
+  const usersById = new Map(store.users.map((user) => [userIdKey(user.id), user]));
   const entries = store.scores
     .filter((score) => score.levelKey === levelKey)
     .sort((a, b) => a.completionMs - b.completionMs || String(a.updatedAt).localeCompare(String(b.updatedAt)) || a.id - b.id);
@@ -199,7 +207,7 @@ function toLeaderboardEntries(store, levelKey, limit = 15) {
   return entries.slice(0, limit).map((score, index) => ({
     rank: index + 1,
     userId: score.userId,
-    firstName: usersById.get(score.userId)?.firstName || "Unknown",
+    firstName: usersById.get(userIdKey(score.userId))?.firstName || "Unknown",
     completionMs: score.completionMs
   }));
 }
@@ -208,31 +216,32 @@ function computeRank(store, levelKey, userId) {
   const sorted = store.scores
     .filter((score) => score.levelKey === levelKey)
     .sort((a, b) => a.completionMs - b.completionMs || String(a.updatedAt).localeCompare(String(b.updatedAt)) || a.id - b.id);
-  const idx = sorted.findIndex((score) => score.userId === userId);
+  const idx = sorted.findIndex((score) => idsEqual(score.userId, userId));
   return idx >= 0 ? idx + 1 : null;
 }
 
 function buildHomeLeaderboards(store, limit = 5) {
-  const completedLevelsByUser = new Map(store.users.map((user) => [user.id, new Set()]));
-  const donutCounts = new Map(store.users.map((user) => [user.id, 0]));
-  const sprinkleCounts = new Map(store.users.map((user) => [user.id, 0]));
+  const completedLevelsByUser = new Map(store.users.map((user) => [userIdKey(user.id), new Set()]));
+  const donutCounts = new Map(store.users.map((user) => [userIdKey(user.id), 0]));
+  const sprinkleCounts = new Map(store.users.map((user) => [userIdKey(user.id), 0]));
   const bestByLevel = new Map();
 
   for (const score of store.scores) {
-    if (completedLevelsByUser.has(score.userId)) {
-      completedLevelsByUser.get(score.userId).add(score.levelKey);
+    const scoreUserId = userIdKey(score.userId);
+    if (completedLevelsByUser.has(scoreUserId)) {
+      completedLevelsByUser.get(scoreUserId).add(score.levelKey);
     }
 
     const currentBest = bestByLevel.get(score.levelKey);
     if (!currentBest || score.completionMs < currentBest.bestMs) {
       bestByLevel.set(score.levelKey, {
         bestMs: score.completionMs,
-        userIds: new Set([score.userId])
+        userIds: new Set([scoreUserId])
       });
       continue;
     }
     if (score.completionMs === currentBest.bestMs) {
-      currentBest.userIds.add(score.userId);
+      currentBest.userIds.add(scoreUserId);
     }
   }
 
@@ -251,7 +260,7 @@ function buildHomeLeaderboards(store, limit = 5) {
       .map((user) => ({
         userId: user.id,
         firstName: user.firstName,
-        value: counts.get(user.id) || 0
+        value: counts.get(userIdKey(user.id)) || 0
       }))
       .sort((a, b) => b.value - a.value || a.firstName.localeCompare(b.firstName) || a.userId - b.userId)
       .slice(0, limit);
@@ -458,7 +467,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       const existing = store.scores.find(
-        (score) => score.levelKey === levelKey && score.userId === auth.user.id
+        (score) => score.levelKey === levelKey && idsEqual(score.userId, auth.user.id)
       );
 
       let updated = false;
@@ -486,7 +495,7 @@ const server = http.createServer(async (req, res) => {
       const leaderboard = toLeaderboardEntries(store, levelKey, 15);
       const rank = computeRank(store, levelKey, auth.user.id);
       const personalBest = store.scores.find(
-        (score) => score.levelKey === levelKey && score.userId === auth.user.id
+        (score) => score.levelKey === levelKey && idsEqual(score.userId, auth.user.id)
       )?.completionMs;
 
       sendJson(req, res, 200, {
@@ -524,7 +533,7 @@ const server = http.createServer(async (req, res) => {
       const auth = requireUser(req, store);
       const leaderboard = toLeaderboardEntries(store, levelKey, limit);
       const personalBest = auth
-        ? store.scores.find((score) => score.levelKey === levelKey && score.userId === auth.user.id)?.completionMs ?? null
+        ? store.scores.find((score) => score.levelKey === levelKey && idsEqual(score.userId, auth.user.id))?.completionMs ?? null
         : null;
       sendJson(req, res, 200, {
         levelKey,
