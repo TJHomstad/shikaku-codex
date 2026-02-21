@@ -78,7 +78,7 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.19";
+const APP_VERSION = "0.67.20";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -111,6 +111,9 @@ const state = {
   inputPreference: "auto",
   activePointer: "mouse",
   mobileLeaderboardOpen: false,
+  levelsRenderId: 0,
+  globalBestCache: new Map(),
+  globalBestRequests: new Map(),
   boardLockedToastShown: false,
   leaderboardRequestId: 0
 };
@@ -447,6 +450,7 @@ function renderHomeOptions() {
 function renderLevelsScreen() {
   const { selectedDifficulty, selectedSize, catalog } = state;
   const available = getAvailableLevels(catalog, selectedDifficulty, selectedSize);
+  const renderId = ++state.levelsRenderId;
   state.availableLevels = available;
 
   dom.levelsSubtitle.textContent = `${selectedDifficulty} - ${selectedSize}x${selectedSize} (${available.length} available in this init build)`;
@@ -466,13 +470,17 @@ function renderLevelsScreen() {
 
     const storageId = puzzleStorageId(selectedDifficulty, selectedSize, level);
     const bestTimes = loadTimes(storageId);
-    meta.textContent = bestTimes.length ? `Local best ${formatMs(bestTimes[0])}` : "Not completed";
+    const localBestMs = bestTimes.length ? bestTimes[0] : null;
+    meta.dataset.levelKey = storageId;
+    renderLevelMeta(meta, localBestMs, null, true);
     button.append(meta);
 
     const availableLevel = available.includes(level);
     if (!availableLevel) {
       button.disabled = true;
       meta.textContent = "Unavailable in sample catalog";
+    } else {
+      void hydrateLevelGlobalBest(storageId, meta, localBestMs, renderId);
     }
 
     button.addEventListener("click", () => {
@@ -482,6 +490,59 @@ function renderLevelsScreen() {
 
     dom.levelsGrid.append(button);
   }
+}
+
+function renderLevelMeta(target, localBestMs, globalBestMs, loadingGlobal = false) {
+  const localLabel = Number.isFinite(localBestMs) ? `Local ${formatMs(localBestMs)}` : "Local -";
+  const globalLabel = loadingGlobal
+    ? "Global ..."
+    : Number.isFinite(globalBestMs)
+      ? `Global ${formatMs(globalBestMs)}`
+      : "Global -";
+  target.textContent = `${localLabel} · ${globalLabel}`;
+}
+
+async function hydrateLevelGlobalBest(levelKey, metaNode, localBestMs, renderId) {
+  const globalBestMs = await getLevelGlobalBest(levelKey);
+  if (renderId !== state.levelsRenderId) return;
+  if (!metaNode.isConnected) return;
+  if (metaNode.dataset.levelKey !== levelKey) return;
+  renderLevelMeta(metaNode, localBestMs, globalBestMs, false);
+}
+
+async function getLevelGlobalBest(levelKey) {
+  if (state.globalBestCache.has(levelKey)) {
+    return state.globalBestCache.get(levelKey);
+  }
+  if (state.globalBestRequests.has(levelKey)) {
+    return state.globalBestRequests.get(levelKey);
+  }
+
+  const request = (async () => {
+    try {
+      const response = await getLeaderboard(levelKey, 1);
+      const top = Array.isArray(response.leaderboard) ? response.leaderboard[0] : null;
+      const completionMs = Number(top?.completionMs);
+      const best = Number.isFinite(completionMs) ? completionMs : null;
+      state.globalBestCache.set(levelKey, best);
+      return best;
+    } catch {
+      return null;
+    } finally {
+      state.globalBestRequests.delete(levelKey);
+    }
+  })();
+
+  state.globalBestRequests.set(levelKey, request);
+  return request;
+}
+
+function updateCachedGlobalBest(levelKey, leaderboard) {
+  if (!levelKey) return;
+  const top = Array.isArray(leaderboard) ? leaderboard[0] : null;
+  const completionMs = Number(top?.completionMs);
+  const best = Number.isFinite(completionMs) ? completionMs : null;
+  state.globalBestCache.set(levelKey, best);
 }
 
 function updateCatalogNote() {
@@ -1040,6 +1101,7 @@ async function onSolved() {
       dom.solvedRank.textContent = response.rank ? `Global Rank: #${response.rank}` : "Global Rank: -";
       renderGlobalLeaderboard(response.leaderboard, state.currentUser.id);
       renderPuzzleLeaderboard(response.leaderboard, state.currentUser.id);
+      updateCachedGlobalBest(levelKey, response.leaderboard);
       return;
     } catch (error) {
       toast(error.message || "Unable to submit global score.", "error");
@@ -1055,6 +1117,7 @@ async function onSolved() {
     }
     renderGlobalLeaderboard(leaderboardResponse.leaderboard, state.currentUser?.id);
     renderPuzzleLeaderboard(leaderboardResponse.leaderboard, state.currentUser?.id);
+    updateCachedGlobalBest(levelKey, leaderboardResponse.leaderboard);
   } catch {
     dom.solvedRank.textContent = "Global Rank: unavailable";
     renderGlobalLeaderboard([], null, "Global leaderboard unavailable.");
@@ -1112,6 +1175,7 @@ async function refreshPuzzleLeaderboard() {
     const response = await getLeaderboard(levelKey, GLOBAL_LEADERBOARD_LIMIT);
     if (requestId !== state.leaderboardRequestId) return;
     renderPuzzleLeaderboard(response.leaderboard, state.currentUser?.id);
+    updateCachedGlobalBest(levelKey, response.leaderboard);
   } catch {
     if (requestId !== state.leaderboardRequestId) return;
     renderPuzzleLeaderboard([], null, "Global leaderboard unavailable.");
