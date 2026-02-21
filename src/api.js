@@ -1,4 +1,5 @@
 const API_BASE_KEY = "shikaku.apiBase";
+const SESSION_TOKEN_KEY = "shikaku.sessionToken";
 
 function normalizeBase(value) {
   return value.replace(/\/$/, "");
@@ -35,11 +36,25 @@ function resolveApiBase() {
 
 const API_BASE = resolveApiBase();
 
+function readSessionToken() {
+  return localStorage.getItem(SESSION_TOKEN_KEY)?.trim() || "";
+}
+
+function writeSessionToken(token) {
+  if (!token) {
+    localStorage.removeItem(SESSION_TOKEN_KEY);
+    return;
+  }
+  localStorage.setItem(SESSION_TOKEN_KEY, token);
+}
+
 async function request(path, options = {}) {
+  const token = readSessionToken();
   const response = await fetch(`${API_BASE}${path}`, {
     method: options.method || "GET",
     headers: {
       "Content-Type": "application/json",
+      ...(token && !options.skipAuth ? { Authorization: `Bearer ${token}` } : {}),
       ...(options.headers || {})
     },
     credentials: "include",
@@ -51,6 +66,9 @@ async function request(path, options = {}) {
     .catch(() => ({}));
 
   if (!response.ok) {
+    if (response.status === 401 && !options.keepTokenOn401) {
+      writeSessionToken("");
+    }
     const message = payload?.error || `Request failed (${response.status}).`;
     const error = new Error(message);
     error.status = response.status;
@@ -65,20 +83,31 @@ export function getApiBase() {
 }
 
 export async function login(firstName, password) {
-  return request("/auth/login", {
+  const payload = await request("/auth/login", {
     method: "POST",
-    body: { firstName, password }
+    body: { firstName, password },
+    skipAuth: true,
+    keepTokenOn401: true
   });
+  writeSessionToken(payload.sessionToken || "");
+  return payload;
 }
 
 export async function logout() {
-  return request("/auth/logout", {
-    method: "POST"
-  });
+  try {
+    return await request("/auth/logout", {
+      method: "POST",
+      keepTokenOn401: true
+    });
+  } finally {
+    writeSessionToken("");
+  }
 }
 
 export async function me() {
-  return request("/auth/me");
+  return request("/auth/me", {
+    keepTokenOn401: true
+  });
 }
 
 export async function submitScore(levelKey, completionMs) {

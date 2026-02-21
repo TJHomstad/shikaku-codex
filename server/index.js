@@ -83,6 +83,14 @@ function parseCookies(header) {
   );
 }
 
+function parseBearerToken(headerValue) {
+  if (!headerValue) return null;
+  const [scheme, token] = String(headerValue).split(" ");
+  if (!scheme || !token) return null;
+  if (scheme.toLowerCase() !== "bearer") return null;
+  return token.trim() || null;
+}
+
 function buildCookie(name, value, options = {}) {
   const parts = [`${encodeURIComponent(name)}=${encodeURIComponent(value)}`];
   if (options.maxAge !== undefined) parts.push(`Max-Age=${options.maxAge}`);
@@ -206,7 +214,9 @@ function computeRank(store, levelKey, userId) {
 
 function findSession(req) {
   const cookies = parseCookies(req.headers.cookie || "");
-  const token = cookies.shikaku_session;
+  const cookieToken = cookies.shikaku_session;
+  const headerToken = parseBearerToken(req.headers.authorization || "");
+  const token = headerToken || cookieToken;
   if (!token) return null;
 
   const session = sessions.get(token);
@@ -285,7 +295,7 @@ const server = http.createServer(async (req, res) => {
       applyCors(req, res);
       res.writeHead(204, {
         "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
       });
       res.end();
       return;
@@ -326,11 +336,11 @@ const server = http.createServer(async (req, res) => {
         req,
         res,
         200,
-        { user: sanitizeUser(user) },
+        { user: sanitizeUser(user), sessionToken: token },
         {
           "Set-Cookie": buildCookie("shikaku_session", token, {
             httpOnly: true,
-            sameSite: "Lax",
+            sameSite: COOKIE_SAME_SITE,
             maxAge: Math.floor(SESSION_TTL_MS / 1000),
             secure: COOKIE_SECURE
           })
@@ -364,7 +374,7 @@ const server = http.createServer(async (req, res) => {
         {
           "Set-Cookie": buildCookie("shikaku_session", "", {
             httpOnly: true,
-            sameSite: "Lax",
+            sameSite: COOKIE_SAME_SITE,
             maxAge: 0,
             secure: COOKIE_SECURE
           })
