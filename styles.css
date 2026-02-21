@@ -257,6 +257,22 @@ button:disabled {
 .level-meta {
   color: var(--muted);
   font-size: 0.82rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem;
+}
+
+.level-meta-local {
+  color: #2f7d32;
+}
+
+.level-meta-global {
+  color: #9f2f2f;
+}
+
+.level-meta-separator {
+  color: var(--muted);
 }
 
 .puzzle-topbar {

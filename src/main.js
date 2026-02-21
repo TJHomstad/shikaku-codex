@@ -78,7 +78,7 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.20";
+const APP_VERSION = "0.67.21";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -499,7 +499,20 @@ function renderLevelMeta(target, localBestMs, globalBestMs, loadingGlobal = fals
     : Number.isFinite(globalBestMs)
       ? `Global ${formatMs(globalBestMs)}`
       : "Global -";
-  target.textContent = `${localLabel} · ${globalLabel}`;
+
+  const local = document.createElement("span");
+  local.className = "level-meta-local";
+  local.textContent = localLabel;
+
+  const separator = document.createElement("span");
+  separator.className = "level-meta-separator";
+  separator.textContent = "·";
+
+  const global = document.createElement("span");
+  global.className = "level-meta-global";
+  global.textContent = globalLabel;
+
+  target.replaceChildren(local, separator, global);
 }
 
 async function hydrateLevelGlobalBest(levelKey, metaNode, localBestMs, renderId) {
