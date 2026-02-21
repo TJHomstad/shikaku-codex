@@ -3,8 +3,9 @@ import { dirname } from "node:path";
 
 const difficulties = ["Beginner", "Easy", "Intermediate", "Advanced", "Insane"];
 const sizes = [6, 10, 20, 25, 40];
-const LEVELS_PER_PAIR = 10;
-const VERSION = "sample-v2-l10";
+const LEVELS_PER_PAIR = 50;
+const CATALOG_VERSION = "canonical-v3-l50";
+const SEED_VERSION = "sample-v2-l10";
 
 const difficultyProfiles = {
   Beginner: {
@@ -331,7 +332,7 @@ function difficultyScore(size, rectangles, profile) {
 
 function buildPuzzle(difficulty, size, level) {
   const profile = difficultyProfiles[difficulty];
-  const rng = createRng(`${VERSION}|${difficulty}|${size}|${level}`);
+  const rng = createRng(`${SEED_VERSION}|${difficulty}|${size}|${level}`);
   const rectangles = tileBoard(size, profile, level, rng);
 
   const clues = rectangles
@@ -383,7 +384,7 @@ async function main() {
   }
 
   await writeJson("assets/catalog-index.json", {
-    version: VERSION,
+    version: CATALOG_VERSION,
     generated_at: new Date().toISOString(),
     levels_per_pair: LEVELS_PER_PAIR,
     levels

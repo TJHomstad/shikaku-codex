@@ -1,5 +1,5 @@
 import { DIFFICULTIES, SIZES } from "./constants.js";
-import { getAvailableLevels, loadCatalog, loadPuzzle } from "./catalog.js";
+import { catalogSummary, getAvailableLevels, loadCatalog, loadPuzzle } from "./catalog.js";
 import {
   autoPlaceSingleCellClues,
   createGameModel,
@@ -78,7 +78,7 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.21";
+const APP_VERSION = "0.67.22";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -453,7 +453,7 @@ function renderLevelsScreen() {
   const renderId = ++state.levelsRenderId;
   state.availableLevels = available;
 
-  dom.levelsSubtitle.textContent = `${selectedDifficulty} - ${selectedSize}x${selectedSize} (${available.length} available in this init build)`;
+  dom.levelsSubtitle.textContent = `${selectedDifficulty} - ${selectedSize}x${selectedSize} (${available.length} available)`;
   dom.levelsGrid.innerHTML = "";
 
   for (let level = 1; level <= 50; level += 1) {
@@ -478,7 +478,7 @@ function renderLevelsScreen() {
     const availableLevel = available.includes(level);
     if (!availableLevel) {
       button.disabled = true;
-      meta.textContent = "Unavailable in sample catalog";
+      meta.textContent = "Unavailable in catalog";
     } else {
       void hydrateLevelGlobalBest(storageId, meta, localBestMs, renderId);
     }
@@ -559,7 +559,7 @@ function updateCachedGlobalBest(levelKey, leaderboard) {
 }
 
 function updateCatalogNote() {
-  dom.homeNote.textContent = "Catalog loaded: 250 levels.";
+  dom.homeNote.textContent = `Catalog loaded: ${catalogSummary(state.catalog)} levels.`;
   dom.homeVersion.textContent = `App Version: ${APP_VERSION}`;
 }
 

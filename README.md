@@ -48,19 +48,18 @@ Notes:
 - Live drag-size indicator while selecting rectangles
 - Auto-fill for clue value `1` cells on fresh load/restart
 - Local persistence for in-progress puzzle and local top 50 times per puzzle
-- Sample canonical catalog in `assets/` (Levels 1-10 for each size/difficulty)
+- Full canonical catalog in `assets/` (Levels 1-50 for each size/difficulty)
 
 ## Catalog notes
 
-The PRD target catalog is 1,250 puzzles. This initialization currently includes the first 10 levels for each size/difficulty pair (250 puzzles total) so the app is runnable immediately.
+The PRD target catalog is 1,250 puzzles. This build now includes the full 50 levels for each size/difficulty pair.
 
 ## Current status (February 14, 2026)
 
 - Implemented: playable desktop MVP with local persistence and deterministic static catalog assets.
 - Implemented: random-level selection from available canonical levels for selected size/difficulty.
-- Pending: expand catalog from 250 to 1,250 puzzles.
 - Pending: add solver-backed solvability/uniqueness validation pipeline for final curation.
 
-To regenerate sample assets:
+To regenerate catalog assets:
 
 - `npm run generate:catalog`
