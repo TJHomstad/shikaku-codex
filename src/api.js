@@ -1,5 +1,7 @@
 const API_BASE_KEY = "shikaku.apiBase";
 const SESSION_TOKEN_KEY = "shikaku.sessionToken";
+const PROD_HOSTS = new Set(["derpydonut.com", "www.derpydonut.com"]);
+const PROD_API_BASE = "https://api.derpydonut.com";
 
 function normalizeBase(value) {
   return value.replace(/\/$/, "");
@@ -7,10 +9,19 @@ function normalizeBase(value) {
 
 function resolveApiBase() {
   const url = new URL(window.location.href);
+  const isProdHost = PROD_HOSTS.has(window.location.hostname);
   const queryOverride = url.searchParams.get("api_base")?.trim();
   if (queryOverride) {
     localStorage.setItem(API_BASE_KEY, queryOverride);
     return normalizeBase(queryOverride);
+  }
+
+  if (isProdHost) {
+    const storedOverride = localStorage.getItem(API_BASE_KEY)?.trim();
+    if (storedOverride && normalizeBase(storedOverride) !== PROD_API_BASE) {
+      localStorage.removeItem(API_BASE_KEY);
+    }
+    return PROD_API_BASE;
   }
 
   const storedOverride = localStorage.getItem(API_BASE_KEY)?.trim();
@@ -27,9 +38,7 @@ function resolveApiBase() {
     return "http://localhost:8787";
   }
 
-  if (window.location.hostname === "derpydonut.com" || window.location.hostname === "www.derpydonut.com") {
-    return "https://api.derpydonut.com";
-  }
+  if (isProdHost) return PROD_API_BASE;
 
   return window.location.origin;
 }

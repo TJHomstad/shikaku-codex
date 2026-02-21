@@ -81,12 +81,13 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.27";
+const APP_VERSION = "0.67.28";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
 const HOME_LEADERBOARD_FALLBACK_USERS = ["Dad", "Mom", "Stephen", "Lydia", "Emmy", "Hazel"];
 const HOME_LEADERBOARD_RETRY_MS = 3 * 60 * 1000;
+const HOME_LEADERBOARD_CACHE_KEY = "shikaku.homeLeaderboards.v1";
 
 const state = {
   catalog: { levels: {} },
@@ -121,7 +122,7 @@ const state = {
   globalBestRequests: new Map(),
   boardLockedToastShown: false,
   leaderboardRequestId: 0,
-  homeLeaderboards: buildFallbackHomeLeaderboards(HOME_LEADERBOARD_LIMIT),
+  homeLeaderboards: loadCachedHomeLeaderboards() || buildFallbackHomeLeaderboards(HOME_LEADERBOARD_LIMIT),
   homeLeaderboardRequestId: 0,
   homeLeaderboardNextAttemptAt: 0
 };
@@ -449,6 +450,40 @@ function buildFallbackHomeLeaderboards(limit = HOME_LEADERBOARD_LIMIT) {
   };
 }
 
+function sanitizeHomeLeaderboardEntries(entries, valueKey) {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .slice(0, HOME_LEADERBOARD_LIMIT)
+    .map((entry, index) => ({
+      rank: Number.isInteger(entry?.rank) ? entry.rank : index + 1,
+      userId: Number.isInteger(entry?.userId) ? entry.userId : null,
+      firstName: typeof entry?.firstName === "string" && entry.firstName.trim() ? entry.firstName.trim() : "Unknown",
+      [valueKey]: Math.max(0, Number.parseInt(String(entry?.[valueKey] ?? 0), 10) || 0)
+    }));
+}
+
+function loadCachedHomeLeaderboards() {
+  try {
+    const raw = localStorage.getItem(HOME_LEADERBOARD_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const donuts = sanitizeHomeLeaderboardEntries(parsed?.donuts, "donuts");
+    const sprinkleDonuts = sanitizeHomeLeaderboardEntries(parsed?.sprinkleDonuts, "sprinkleDonuts");
+    if (!donuts.length && !sprinkleDonuts.length) return null;
+    return { donuts, sprinkleDonuts };
+  } catch {
+    return null;
+  }
+}
+
+function saveCachedHomeLeaderboards(value) {
+  try {
+    localStorage.setItem(HOME_LEADERBOARD_CACHE_KEY, JSON.stringify(value));
+  } catch {
+    // Ignore localStorage write errors.
+  }
+}
+
 function renderHomeLeaderboards() {
   renderHomePointsList(dom.homeDonutsList, state.homeLeaderboards.donuts, {
     valueKey: "donuts",
@@ -507,9 +542,10 @@ async function refreshHomeLeaderboards() {
     const response = await getHomeLeaderboards(HOME_LEADERBOARD_LIMIT);
     if (requestId !== state.homeLeaderboardRequestId) return;
     state.homeLeaderboards = {
-      donuts: Array.isArray(response.donuts) ? response.donuts : [],
-      sprinkleDonuts: Array.isArray(response.sprinkleDonuts) ? response.sprinkleDonuts : []
+      donuts: sanitizeHomeLeaderboardEntries(response.donuts, "donuts"),
+      sprinkleDonuts: sanitizeHomeLeaderboardEntries(response.sprinkleDonuts, "sprinkleDonuts")
     };
+    saveCachedHomeLeaderboards(state.homeLeaderboards);
     state.homeLeaderboardNextAttemptAt = 0;
     renderHomeLeaderboards();
   } catch {
