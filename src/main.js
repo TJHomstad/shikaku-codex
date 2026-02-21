@@ -81,7 +81,7 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.32";
+const APP_VERSION = "0.67.33";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -534,7 +534,7 @@ function renderHomePointsList(target, entries, { valueKey, emptyMessage }) {
 
     const icon = document.createElement("img");
     icon.className = "home-points-icon";
-    icon.src = valueKey === "sprinkleDonuts" ? "donut-sprinkles.png" : "donut-plain.png";
+    icon.src = valueKey === "sprinkleDonuts" ? "donut-sprinkles-2.png" : "donut-plain-2.png";
     icon.alt = "";
     icon.setAttribute("aria-hidden", "true");
 
