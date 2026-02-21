@@ -101,7 +101,7 @@ nav a {
 }
 
 .home-brand-logo {
-  width: min(280px, 65vw);
+  width: 50vw;
   height: auto;
   display: block;
 }
