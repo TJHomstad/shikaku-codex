@@ -263,16 +263,8 @@ button:disabled {
   gap: 0.25rem;
 }
 
-.level-meta-local {
-  color: #2f7d32;
-}
-
-.level-meta-global {
+.level-meta-world-record {
   color: #9f2f2f;
-}
-
-.level-meta-separator {
-  color: var(--muted);
 }
 
 .puzzle-topbar {
@@ -483,6 +475,12 @@ dialog {
 
 .score-entry.current {
   background: var(--accent-soft);
+  font-weight: 700;
+}
+
+.score-entry.your-best {
+  border: 1px solid #d8ccb7;
+  background: #fff8ea;
   font-weight: 700;
 }
 

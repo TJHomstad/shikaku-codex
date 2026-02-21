@@ -452,9 +452,14 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      const auth = requireUser(req, store);
       const leaderboard = toLeaderboardEntries(store, levelKey, limit);
+      const personalBest = auth
+        ? store.scores.find((score) => score.levelKey === levelKey && score.userId === auth.user.id)?.completionMs ?? null
+        : null;
       sendJson(req, res, 200, {
         levelKey,
+        personalBest,
         leaderboard,
         totalPlayers: store.scores.filter((score) => score.levelKey === levelKey).length
       });

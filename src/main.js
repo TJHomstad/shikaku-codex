@@ -78,7 +78,7 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.22";
+const APP_VERSION = "0.67.23";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -469,10 +469,8 @@ function renderLevelsScreen() {
     meta.className = "level-meta";
 
     const storageId = puzzleStorageId(selectedDifficulty, selectedSize, level);
-    const bestTimes = loadTimes(storageId);
-    const localBestMs = bestTimes.length ? bestTimes[0] : null;
     meta.dataset.levelKey = storageId;
-    renderLevelMeta(meta, localBestMs, null, true);
+    renderLevelMeta(meta, null, true);
     button.append(meta);
 
     const availableLevel = available.includes(level);
@@ -480,7 +478,7 @@ function renderLevelsScreen() {
       button.disabled = true;
       meta.textContent = "Unavailable in catalog";
     } else {
-      void hydrateLevelGlobalBest(storageId, meta, localBestMs, renderId);
+      void hydrateLevelGlobalBest(storageId, meta, renderId);
     }
 
     button.addEventListener("click", () => {
@@ -492,35 +490,26 @@ function renderLevelsScreen() {
   }
 }
 
-function renderLevelMeta(target, localBestMs, globalBestMs, loadingGlobal = false) {
-  const localLabel = Number.isFinite(localBestMs) ? `Local ${formatMs(localBestMs)}` : "Local -";
-  const globalLabel = loadingGlobal
-    ? "Global ..."
-    : Number.isFinite(globalBestMs)
-      ? `Global ${formatMs(globalBestMs)}`
-      : "Global -";
+function renderLevelMeta(target, worldRecordMs, loadingWorldRecord = false) {
+  const label = loadingWorldRecord
+    ? "World Record ..."
+    : Number.isFinite(worldRecordMs)
+      ? `World Record ${formatMs(worldRecordMs)}`
+      : "World Record -";
 
-  const local = document.createElement("span");
-  local.className = "level-meta-local";
-  local.textContent = localLabel;
+  const worldRecord = document.createElement("span");
+  worldRecord.className = "level-meta-world-record";
+  worldRecord.textContent = label;
 
-  const separator = document.createElement("span");
-  separator.className = "level-meta-separator";
-  separator.textContent = "·";
-
-  const global = document.createElement("span");
-  global.className = "level-meta-global";
-  global.textContent = globalLabel;
-
-  target.replaceChildren(local, separator, global);
+  target.replaceChildren(worldRecord);
 }
 
-async function hydrateLevelGlobalBest(levelKey, metaNode, localBestMs, renderId) {
+async function hydrateLevelGlobalBest(levelKey, metaNode, renderId) {
   const globalBestMs = await getLevelGlobalBest(levelKey);
   if (renderId !== state.levelsRenderId) return;
   if (!metaNode.isConnected) return;
   if (metaNode.dataset.levelKey !== levelKey) return;
-  renderLevelMeta(metaNode, localBestMs, globalBestMs, false);
+  renderLevelMeta(metaNode, globalBestMs, false);
 }
 
 async function getLevelGlobalBest(levelKey) {
@@ -618,7 +607,10 @@ async function openPuzzle(difficulty, size, level) {
 
     showScreen("puzzle");
     dom.puzzleNote.textContent = "";
-    renderPuzzleLeaderboard([], null, "Loading leaderboard...");
+    renderPuzzleLeaderboard([], state.currentUser?.id, {
+      levelKey: storageId,
+      emptyMessage: "Loading leaderboard..."
+    });
     void refreshPuzzleLeaderboard();
 
     clearInterval(state.autosaveInterval);
@@ -662,7 +654,8 @@ function syncPuzzleHeader() {
   dom.metaSize.textContent = `${state.current.size}x${state.current.size}`;
   dom.metaLevel.textContent = `Level ${state.current.level}`;
   dom.timerDisplay.textContent = formatMs(currentElapsedMs());
-  dom.puzzleLeaderboardMeta.textContent = `Top ${GLOBAL_LEADERBOARD_LIMIT} times for ${state.current.difficulty} ${state.current.size}x${state.current.size} Level ${state.current.level}`;
+  dom.puzzleLeaderboardMeta.textContent =
+    `World top ${GLOBAL_LEADERBOARD_LIMIT} for ${state.current.difficulty} ${state.current.size}x${state.current.size} Level ${state.current.level}`;
 }
 
 function syncPuzzleControls() {
@@ -1103,7 +1096,10 @@ async function onSolved() {
   dom.solvedBest.textContent = `Your Best: ${localTimes.length ? formatMs(localTimes[0]) : formatMs(finalMs)}`;
   dom.solvedRank.textContent = state.currentUser ? "Global Rank: loading..." : "Global Rank: sign in to submit.";
   renderGlobalLeaderboard([], null, "Loading leaderboard...");
-  renderPuzzleLeaderboard([], null, "Loading leaderboard...");
+  renderPuzzleLeaderboard([], state.currentUser?.id, {
+    levelKey,
+    emptyMessage: "Loading leaderboard..."
+  });
 
   dom.solvedModal.showModal();
   if (state.currentUser) {
@@ -1113,7 +1109,10 @@ async function onSolved() {
       dom.solvedBest.textContent = `Your Best: ${formatMs(personalBest)}`;
       dom.solvedRank.textContent = response.rank ? `Global Rank: #${response.rank}` : "Global Rank: -";
       renderGlobalLeaderboard(response.leaderboard, state.currentUser.id);
-      renderPuzzleLeaderboard(response.leaderboard, state.currentUser.id);
+      renderPuzzleLeaderboard(response.leaderboard, state.currentUser.id, {
+        levelKey,
+        personalBestMs: response.personalBest
+      });
       updateCachedGlobalBest(levelKey, response.leaderboard);
       return;
     } catch (error) {
@@ -1129,12 +1128,18 @@ async function onSolved() {
       dom.solvedRank.textContent = "Global Rank: unavailable";
     }
     renderGlobalLeaderboard(leaderboardResponse.leaderboard, state.currentUser?.id);
-    renderPuzzleLeaderboard(leaderboardResponse.leaderboard, state.currentUser?.id);
+    renderPuzzleLeaderboard(leaderboardResponse.leaderboard, state.currentUser?.id, {
+      levelKey,
+      personalBestMs: leaderboardResponse.personalBest
+    });
     updateCachedGlobalBest(levelKey, leaderboardResponse.leaderboard);
   } catch {
     dom.solvedRank.textContent = "Global Rank: unavailable";
     renderGlobalLeaderboard([], null, "Global leaderboard unavailable.");
-    renderPuzzleLeaderboard([], null, "Global leaderboard unavailable.");
+    renderPuzzleLeaderboard([], state.currentUser?.id, {
+      levelKey,
+      emptyMessage: "Global leaderboard unavailable."
+    });
   }
 }
 
@@ -1142,12 +1147,39 @@ function renderGlobalLeaderboard(leaderboard, currentUserId, emptyMessage = "No 
   renderLeaderboardList(dom.solvedLeaderboard, leaderboard, currentUserId, emptyMessage);
 }
 
-function renderPuzzleLeaderboard(leaderboard, currentUserId, emptyMessage = "No global times yet.") {
-  renderLeaderboardList(dom.puzzleLeaderboard, leaderboard, currentUserId, emptyMessage);
+function renderPuzzleLeaderboard(
+  leaderboard,
+  currentUserId,
+  { levelKey = null, personalBestMs = null, emptyMessage = "No global times yet." } = {}
+) {
+  const yourBestMs = resolveYourBestMs({ leaderboard, currentUserId, levelKey, personalBestMs });
+  renderLeaderboardList(dom.puzzleLeaderboard, leaderboard, currentUserId, emptyMessage, yourBestMs);
 }
 
-function renderLeaderboardList(target, leaderboard, currentUserId, emptyMessage = "No global times yet.") {
+function renderLeaderboardList(
+  target,
+  leaderboard,
+  currentUserId,
+  emptyMessage = "No global times yet.",
+  yourBestMs = undefined
+) {
   target.innerHTML = "";
+
+  if (yourBestMs !== undefined) {
+    const yourBestItem = document.createElement("li");
+    yourBestItem.className = "score-entry your-best";
+
+    const main = document.createElement("span");
+    main.className = "score-entry-main";
+    main.textContent = "Your best time";
+
+    const time = document.createElement("span");
+    time.className = "score-entry-time";
+    time.textContent = Number.isFinite(yourBestMs) ? formatMs(yourBestMs) : "-";
+
+    yourBestItem.append(main, time);
+    target.append(yourBestItem);
+  }
 
   if (!Array.isArray(leaderboard) || !leaderboard.length) {
     const empty = document.createElement("li");
@@ -1178,6 +1210,28 @@ function renderLeaderboardList(target, leaderboard, currentUserId, emptyMessage 
   }
 }
 
+function resolveYourBestMs({ leaderboard, currentUserId, levelKey, personalBestMs }) {
+  if (Number.isFinite(personalBestMs)) {
+    return personalBestMs;
+  }
+
+  if (currentUserId && Array.isArray(leaderboard)) {
+    const mine = leaderboard.find((entry) => entry.userId === currentUserId);
+    if (Number.isFinite(Number(mine?.completionMs))) {
+      return Number(mine.completionMs);
+    }
+  }
+
+  if (!currentUserId && levelKey) {
+    const localTimes = loadTimes(levelKey);
+    if (localTimes.length && Number.isFinite(Number(localTimes[0]))) {
+      return Number(localTimes[0]);
+    }
+  }
+
+  return null;
+}
+
 async function refreshPuzzleLeaderboard() {
   if (!state.current) return;
 
@@ -1187,11 +1241,17 @@ async function refreshPuzzleLeaderboard() {
   try {
     const response = await getLeaderboard(levelKey, GLOBAL_LEADERBOARD_LIMIT);
     if (requestId !== state.leaderboardRequestId) return;
-    renderPuzzleLeaderboard(response.leaderboard, state.currentUser?.id);
+    renderPuzzleLeaderboard(response.leaderboard, state.currentUser?.id, {
+      levelKey,
+      personalBestMs: response.personalBest
+    });
     updateCachedGlobalBest(levelKey, response.leaderboard);
   } catch {
     if (requestId !== state.leaderboardRequestId) return;
-    renderPuzzleLeaderboard([], null, "Global leaderboard unavailable.");
+    renderPuzzleLeaderboard([], state.currentUser?.id, {
+      levelKey,
+      emptyMessage: "Global leaderboard unavailable."
+    });
   }
 }
 
