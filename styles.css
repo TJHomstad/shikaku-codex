@@ -216,6 +216,13 @@ button:disabled {
   row-gap: 0.7rem;
 }
 
+.touch-help {
+  display: none;
+  margin: 0.65rem 0 0.2rem;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
 .note {
   margin-top: 0.8rem;
   min-height: 1.4rem;
@@ -542,6 +549,10 @@ dialog::backdrop {
     align-items: center;
     justify-content: center;
     width: fit-content;
+  }
+
+  .touch-help {
+    display: block;
   }
 
   .board-wrap {

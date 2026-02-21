@@ -2,12 +2,10 @@ import { DIFFICULTIES, SIZES } from "./constants.js";
 import { getAvailableLevels, loadCatalog, loadPuzzle } from "./catalog.js";
 import {
   autoPlaceSingleCellClues,
-  clearAll,
   createGameModel,
   eraseRectangleAt,
   findNextAvailableLevel,
   placeRectangle,
-  redo,
   serializeRectangles,
   undo
 } from "./game.js";
@@ -60,10 +58,8 @@ const dom = {
   dragSizeIndicator: document.querySelector("#drag-size-indicator"),
   boardOverlay: document.querySelector("#board-overlay"),
   undoBtn: document.querySelector("#undo-btn"),
-  redoBtn: document.querySelector("#redo-btn"),
   pauseBtn: document.querySelector("#pause-btn"),
   eraseBtn: document.querySelector("#erase-btn"),
-  clearBtn: document.querySelector("#clear-btn"),
   restartBtn: document.querySelector("#restart-btn"),
   toLevelsBtn: document.querySelector("#to-levels-btn"),
   solvedModal: document.querySelector("#solved-modal"),
@@ -82,7 +78,7 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.17";
+const APP_VERSION = "0.67.18";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -196,13 +192,6 @@ function bindEvents() {
     postBoardMutation();
   });
 
-  dom.redoBtn.addEventListener("click", () => {
-    if (!canMutateBoard()) return;
-    const result = redo(state.model);
-    if (!result.ok) toast(result.reason);
-    postBoardMutation();
-  });
-
   dom.pauseBtn.addEventListener("click", () => {
     if (!state.model || !state.started) return;
     if (state.paused) {
@@ -218,13 +207,6 @@ function bindEvents() {
     if (!state.model) return;
     state.eraseMode = !state.eraseMode;
     syncPuzzleControls();
-  });
-
-  dom.clearBtn.addEventListener("click", () => {
-    if (!canMutateBoard()) return;
-    const result = clearAll(state.model);
-    if (!result.ok) toast(result.reason);
-    postBoardMutation();
   });
 
   dom.restartBtn.addEventListener("click", () => {
