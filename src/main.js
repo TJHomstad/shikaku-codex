@@ -81,7 +81,7 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.30";
+const APP_VERSION = "0.67.31";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
