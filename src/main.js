@@ -82,7 +82,7 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.15";
+const APP_VERSION = "0.67.16";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -294,6 +294,8 @@ function bindEvents() {
   dom.board.addEventListener("pointerdown", onBoardPointerDown);
   dom.board.addEventListener("pointermove", onBoardPointerMove);
   dom.board.addEventListener("contextmenu", onBoardContextMenu);
+  dom.boardWrap.addEventListener("selectstart", preventDefaultBehavior);
+  dom.boardWrap.addEventListener("dragstart", preventDefaultBehavior);
   window.addEventListener("pointerup", onGlobalPointerUp);
   window.addEventListener("pointercancel", onGlobalPointerUp);
   window.addEventListener("resize", onWindowResize);
@@ -846,18 +848,25 @@ function handleTouchTap(r, c) {
 
   const hasPlacement = Boolean(state.model.occupancy[r]?.[c]);
   const now = Date.now();
+  const sameAsAnchor = Boolean(state.touchAnchor) && state.touchAnchor.r === r && state.touchAnchor.c === c;
   const isDoubleTap =
-    !state.touchAnchor &&
     hasPlacement &&
     state.touchLastTap &&
     now - state.touchLastTap.time <= DOUBLE_TAP_WINDOW_MS &&
     state.touchLastTap.r === r &&
-    state.touchLastTap.c === c;
+    state.touchLastTap.c === c &&
+    (!state.touchAnchor || sameAsAnchor);
 
   if (isDoubleTap) {
     eraseAtCoordinates(r, c);
     state.touchLastTap = null;
     state.touchAnchor = null;
+    return;
+  }
+
+  if (hasPlacement && !state.touchAnchor) {
+    state.touchLastTap = { r, c, time: now };
+    dom.puzzleNote.textContent = "Double tap a filled rectangle to erase it.";
     return;
   }
 
@@ -879,6 +888,10 @@ function handleTouchTap(r, c) {
   const rect = rectFromPoints(state.touchAnchor.r, state.touchAnchor.c, r, c);
   state.touchAnchor = null;
   applyPlacement(rect);
+}
+
+function preventDefaultBehavior(event) {
+  event.preventDefault();
 }
 
 function beginTouchGesture() {
