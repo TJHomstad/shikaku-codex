@@ -81,11 +81,12 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.26";
+const APP_VERSION = "0.67.27";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
 const HOME_LEADERBOARD_FALLBACK_USERS = ["Dad", "Mom", "Stephen", "Lydia", "Emmy", "Hazel"];
+const HOME_LEADERBOARD_RETRY_MS = 3 * 60 * 1000;
 
 const state = {
   catalog: { levels: {} },
@@ -122,7 +123,7 @@ const state = {
   leaderboardRequestId: 0,
   homeLeaderboards: buildFallbackHomeLeaderboards(HOME_LEADERBOARD_LIMIT),
   homeLeaderboardRequestId: 0,
-  homeLeaderboardDisabled: false
+  homeLeaderboardNextAttemptAt: 0
 };
 
 void init();
@@ -433,17 +434,6 @@ async function handleLogout() {
   toast("Signed out. Playing as guest.");
 }
 
-function renderHomeLeaderboardLoading() {
-  renderHomePointsList(dom.homeDonutsList, [], {
-    valueKey: "donuts",
-    emptyMessage: "Loading donuts..."
-  });
-  renderHomePointsList(dom.homeSprinkleDonutsList, [], {
-    valueKey: "sprinkleDonuts",
-    emptyMessage: "Loading sprinkle donuts..."
-  });
-}
-
 function buildFallbackHomeLeaderboards(limit = HOME_LEADERBOARD_LIMIT) {
   const entries = HOME_LEADERBOARD_FALLBACK_USERS.slice(0, limit).map((firstName, index) => ({
     rank: index + 1,
@@ -507,24 +497,24 @@ function renderHomePointsList(target, entries, { valueKey, emptyMessage }) {
 }
 
 async function refreshHomeLeaderboards() {
-  if (state.homeLeaderboardDisabled) {
-    renderHomeLeaderboards();
+  const now = Date.now();
+  if (now < state.homeLeaderboardNextAttemptAt) {
     return;
   }
 
   const requestId = ++state.homeLeaderboardRequestId;
   try {
-    renderHomeLeaderboardLoading();
     const response = await getHomeLeaderboards(HOME_LEADERBOARD_LIMIT);
     if (requestId !== state.homeLeaderboardRequestId) return;
     state.homeLeaderboards = {
       donuts: Array.isArray(response.donuts) ? response.donuts : [],
       sprinkleDonuts: Array.isArray(response.sprinkleDonuts) ? response.sprinkleDonuts : []
     };
+    state.homeLeaderboardNextAttemptAt = 0;
     renderHomeLeaderboards();
   } catch {
     if (requestId !== state.homeLeaderboardRequestId) return;
-    state.homeLeaderboardDisabled = true;
+    state.homeLeaderboardNextAttemptAt = Date.now() + HOME_LEADERBOARD_RETRY_MS;
     if (!Array.isArray(state.homeLeaderboards.donuts) || !state.homeLeaderboards.donuts.length) {
       state.homeLeaderboards = buildFallbackHomeLeaderboards(HOME_LEADERBOARD_LIMIT);
     }

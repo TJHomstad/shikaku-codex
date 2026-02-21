@@ -213,12 +213,15 @@ function computeRank(store, levelKey, userId) {
 }
 
 function buildHomeLeaderboards(store, limit = 5) {
+  const completedLevelsByUser = new Map(store.users.map((user) => [user.id, new Set()]));
   const donutCounts = new Map(store.users.map((user) => [user.id, 0]));
   const sprinkleCounts = new Map(store.users.map((user) => [user.id, 0]));
   const bestByLevel = new Map();
 
   for (const score of store.scores) {
-    donutCounts.set(score.userId, (donutCounts.get(score.userId) || 0) + 1);
+    if (completedLevelsByUser.has(score.userId)) {
+      completedLevelsByUser.get(score.userId).add(score.levelKey);
+    }
 
     const currentBest = bestByLevel.get(score.levelKey);
     if (!currentBest || score.completionMs < currentBest.bestMs) {
@@ -237,6 +240,10 @@ function buildHomeLeaderboards(store, limit = 5) {
     for (const userId of best.userIds) {
       sprinkleCounts.set(userId, (sprinkleCounts.get(userId) || 0) + 1);
     }
+  }
+
+  for (const [userId, levels] of completedLevelsByUser.entries()) {
+    donutCounts.set(userId, levels.size);
   }
 
   const buildEntries = (counts, valueKey) => {
