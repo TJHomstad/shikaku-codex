@@ -512,6 +512,25 @@ dialog {
   flex: 0 0 auto;
 }
 
+.home-points-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.home-points-count {
+  min-width: 1ch;
+  text-align: right;
+}
+
+.home-points-icon {
+  width: 1rem;
+  height: 1rem;
+  object-fit: contain;
+  display: block;
+}
+
 .home-points-value.donut {
   color: #8b5e34;
 }

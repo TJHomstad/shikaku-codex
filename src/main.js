@@ -81,7 +81,7 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.31";
+const APP_VERSION = "0.67.32";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -521,10 +521,24 @@ function renderHomePointsList(target, entries, { valueKey, emptyMessage }) {
     const points = Number(entry[valueKey]) || 0;
     const time = document.createElement("span");
     time.className = `score-entry-time home-points-value ${valueKey === "sprinkleDonuts" ? "sprinkle" : "donut"}`;
-    time.textContent =
+    time.setAttribute(
+      "aria-label",
       valueKey === "sprinkleDonuts"
         ? `${points} sprinkle donut${points === 1 ? "" : "s"}`
-        : `${points} donut${points === 1 ? "" : "s"}`;
+        : `${points} donut${points === 1 ? "" : "s"}`
+    );
+
+    const count = document.createElement("span");
+    count.className = "home-points-count";
+    count.textContent = String(points);
+
+    const icon = document.createElement("img");
+    icon.className = "home-points-icon";
+    icon.src = valueKey === "sprinkleDonuts" ? "donut-sprinkles.png" : "donut-plain.png";
+    icon.alt = "";
+    icon.setAttribute("aria-hidden", "true");
+
+    time.append(count, icon);
 
     item.append(main, time);
     target.append(item);
