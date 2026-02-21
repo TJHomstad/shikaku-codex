@@ -54,6 +54,7 @@ const dom = {
   metaSize: document.querySelector("#meta-size"),
   metaLevel: document.querySelector("#meta-level"),
   timerDisplay: document.querySelector("#timer-display"),
+  inputModeSelect: document.querySelector("#input-mode-select"),
   boardWrap: document.querySelector("#board-wrap"),
   board: document.querySelector("#board"),
   dragSizeIndicator: document.querySelector("#drag-size-indicator"),
@@ -70,6 +71,8 @@ const dom = {
   solvedBest: document.querySelector("#solved-best"),
   solvedRank: document.querySelector("#solved-rank"),
   solvedLeaderboard: document.querySelector("#solved-leaderboard"),
+  puzzleScoreboard: document.querySelector("#puzzle-scoreboard"),
+  puzzleLeaderboardToggle: document.querySelector("#puzzle-leaderboard-toggle"),
   puzzleLeaderboard: document.querySelector("#puzzle-leaderboard"),
   puzzleLeaderboardMeta: document.querySelector("#puzzle-leaderboard-meta"),
   nextLevelBtn: document.querySelector("#next-level-btn"),
@@ -80,6 +83,12 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const APP_VERSION = "0.67.14";
+const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
+const MAX_TOUCH_ZOOM = 3;
+const TAP_MOVE_TOLERANCE_PX = 10;
+const DOUBLE_TAP_WINDOW_MS = 280;
+const LONG_PRESS_MS = 420;
+const LONG_PRESS_MOVE_TOLERANCE_PX = 8;
 
 const state = {
   catalog: { levels: {} },
@@ -99,6 +108,16 @@ const state = {
   timerInterval: null,
   autosaveInterval: null,
   drag: null,
+  touchAnchor: null,
+  touchState: null,
+  touchLastTap: null,
+  touchPoints: new Map(),
+  touchGesture: null,
+  boardZoom: 1,
+  baseCellSize: 28,
+  inputPreference: "auto",
+  activePointer: "mouse",
+  mobileLeaderboardOpen: false,
   boardLockedToastShown: false,
   leaderboardRequestId: 0
 };
@@ -107,7 +126,10 @@ void init();
 
 async function init() {
   renderHomeOptions();
+  initInputPreference();
   bindEvents();
+  syncInputModeUi();
+  syncPuzzleLeaderboardPanel();
 
   state.catalog = await loadCatalog();
   updateCatalogNote();
@@ -219,6 +241,34 @@ function bindEvents() {
     renderLevelsScreen();
   });
 
+  dom.inputModeSelect.addEventListener("change", () => {
+    const next = dom.inputModeSelect.value;
+    if (next !== "auto" && next !== "mouse" && next !== "touch") return;
+    state.inputPreference = next;
+    localStorage.setItem(INPUT_MODE_STORAGE_KEY, next);
+    state.touchAnchor = null;
+    state.touchLastTap = null;
+    state.touchPoints.clear();
+    state.touchGesture = null;
+    state.drag = null;
+    cancelTouchState();
+    if (next === "mouse") {
+      state.boardZoom = 1;
+      dom.boardWrap.scrollLeft = 0;
+      dom.boardWrap.scrollTop = 0;
+    }
+    syncInputModeUi();
+    if (state.model) {
+      buildBoard();
+      renderBoard();
+    }
+  });
+
+  dom.puzzleLeaderboardToggle.addEventListener("click", () => {
+    state.mobileLeaderboardOpen = !state.mobileLeaderboardOpen;
+    syncPuzzleLeaderboardPanel();
+  });
+
   dom.nextLevelBtn.addEventListener("click", () => {
     if (!state.current) return;
     const next = findNextAvailableLevel(state.availableLevels, state.current.level);
@@ -241,15 +291,73 @@ function bindEvents() {
     renderLevelsScreen();
   });
 
-  dom.board.addEventListener("mousedown", onBoardMouseDown);
-  dom.board.addEventListener("mouseover", onBoardMouseOver);
+  dom.board.addEventListener("pointerdown", onBoardPointerDown);
+  dom.board.addEventListener("pointermove", onBoardPointerMove);
   dom.board.addEventListener("contextmenu", onBoardContextMenu);
-  window.addEventListener("mouseup", onGlobalMouseUp);
+  window.addEventListener("pointerup", onGlobalPointerUp);
+  window.addEventListener("pointercancel", onGlobalPointerUp);
   window.addEventListener("resize", onWindowResize);
 
   window.addEventListener("beforeunload", () => {
     saveCurrentProgress();
   });
+}
+
+function initInputPreference() {
+  const saved = localStorage.getItem(INPUT_MODE_STORAGE_KEY);
+  if (saved === "mouse" || saved === "touch" || saved === "auto") {
+    state.inputPreference = saved;
+  }
+}
+
+function getEffectiveInputMode() {
+  if (state.inputPreference === "mouse" || state.inputPreference === "touch") {
+    return state.inputPreference;
+  }
+  return state.activePointer;
+}
+
+function syncInputModeUi() {
+  dom.inputModeSelect.value = state.inputPreference;
+}
+
+function syncPuzzleLeaderboardPanel() {
+  const isMobile = window.innerWidth <= 900;
+  if (!isMobile) {
+    dom.puzzleLeaderboardToggle.hidden = true;
+    dom.puzzleScoreboard.hidden = false;
+    return;
+  }
+
+  dom.puzzleLeaderboardToggle.hidden = false;
+  dom.puzzleScoreboard.hidden = !state.mobileLeaderboardOpen;
+  dom.puzzleLeaderboardToggle.textContent = state.mobileLeaderboardOpen ? "Hide Leaderboard" : "Show Leaderboard";
+}
+
+function setActivePointer(pointerType) {
+  const next = pointerType === "touch" || pointerType === "pen" ? "touch" : "mouse";
+  if (state.activePointer === next) return;
+
+  const prevEffectiveMode = getEffectiveInputMode();
+  state.activePointer = next;
+  const nextEffectiveMode = getEffectiveInputMode();
+  if (nextEffectiveMode === prevEffectiveMode) return;
+
+  state.touchAnchor = null;
+  state.drag = null;
+  state.touchLastTap = null;
+  state.touchPoints.clear();
+  state.touchGesture = null;
+  cancelTouchState();
+  if (nextEffectiveMode === "mouse") {
+    state.boardZoom = 1;
+    dom.boardWrap.scrollLeft = 0;
+    dom.boardWrap.scrollTop = 0;
+  }
+  if (state.model) {
+    buildBoard();
+    renderBoard();
+  }
 }
 
 async function restoreSession() {
@@ -426,6 +534,15 @@ async function openPuzzle(difficulty, size, level) {
     state.availableLevels = getAvailableLevels(state.catalog, difficulty, size);
     state.eraseMode = false;
     state.drag = null;
+    state.touchAnchor = null;
+    state.touchLastTap = null;
+    state.touchPoints.clear();
+    state.touchGesture = null;
+    cancelTouchState();
+    state.boardZoom = 1;
+    dom.boardWrap.scrollLeft = 0;
+    dom.boardWrap.scrollTop = 0;
+    state.mobileLeaderboardOpen = false;
     state.boardLockedToastShown = false;
 
     state.elapsedBeforeStart = Number.isInteger(progress?.elapsed_ms) ? progress.elapsed_ms : 0;
@@ -441,6 +558,7 @@ async function openPuzzle(difficulty, size, level) {
     renderBoard();
     syncPuzzleHeader();
     syncPuzzleControls();
+    syncPuzzleLeaderboardPanel();
     refreshContinueButton();
 
     showScreen("puzzle");
@@ -466,6 +584,15 @@ function restartPuzzle() {
   autoPlaceSingleCellClues(state.model);
   state.eraseMode = false;
   state.drag = null;
+  state.touchAnchor = null;
+  state.touchLastTap = null;
+  state.touchPoints.clear();
+  state.touchGesture = null;
+  cancelTouchState();
+  state.boardZoom = 1;
+  dom.boardWrap.scrollLeft = 0;
+  dom.boardWrap.scrollTop = 0;
+  applyBoardCellSize();
   state.elapsedBeforeStart = 0;
   dom.timerDisplay.textContent = formatMs(state.elapsedBeforeStart);
   renderBoard();
@@ -547,38 +674,41 @@ function stopTimer() {
   syncPuzzleControls();
 }
 
-function onBoardMouseDown(event) {
-  if (event.button !== 0) return;
-  const cell = event.target.closest(".cell");
-  if (!cell || !state.model) return;
+function onBoardPointerDown(event) {
+  if (!state.model) return;
 
-  event.preventDefault();
-
+  const cell = getCellFromPointerEvent(event);
+  if (!cell) return;
   const r = Number(cell.dataset.r);
   const c = Number(cell.dataset.c);
 
-  if (!state.started) {
-    if (!state.boardLockedToastShown) {
-      toast("Press here to begin.");
-      state.boardLockedToastShown = true;
+  setActivePointer(event.pointerType);
+  const mode = getEffectiveInputMode();
+
+  if (mode === "touch") {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    if (event.pointerType === "touch" || event.pointerType === "pen") {
+      state.touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
     }
+    event.preventDefault();
+    captureBoardPointer(event.pointerId);
+    onTouchPointerDown(event, r, c);
     return;
   }
-  if (state.paused) return;
 
-  if (state.model.solved) return;
+  if (event.pointerType !== "mouse" || event.button !== 0) return;
+  if (!canInteractBoard()) return;
+
+  captureBoardPointer(event.pointerId);
 
   if (state.eraseMode) {
-    const result = eraseRectangleAt(state.model, r, c);
-    if (!result.ok) {
-      toast(result.reason);
-      return;
-    }
-    postBoardMutation();
+    eraseAtCoordinates(r, c);
     return;
   }
 
+  state.touchAnchor = null;
   state.drag = {
+    pointerId: event.pointerId,
     startR: r,
     startC: c,
     rect: { r1: r, c1: c, r2: r, c2: c }
@@ -586,10 +716,20 @@ function onBoardMouseDown(event) {
   renderBoard();
 }
 
-function onBoardMouseOver(event) {
-  if (!state.drag || !state.model) return;
+function onBoardPointerMove(event) {
+  if (event.pointerType === "touch" || event.pointerType === "pen") {
+    state.touchPoints.set(event.pointerId, { x: event.clientX, y: event.clientY });
+  }
 
-  const cell = event.target.closest(".cell");
+  if (getEffectiveInputMode() === "touch") {
+    onTouchPointerMove(event);
+    return;
+  }
+
+  if (!state.drag || !state.model) return;
+  if (state.drag.pointerId !== event.pointerId) return;
+
+  const cell = getCellFromPointerEvent(event);
   if (!cell) return;
 
   const r = Number(cell.dataset.r);
@@ -598,11 +738,269 @@ function onBoardMouseOver(event) {
   renderBoard();
 }
 
-function onGlobalMouseUp() {
-  if (!state.drag || !state.model) return;
+function onGlobalPointerUp(event) {
+  if (event.pointerType === "touch" || event.pointerType === "pen") {
+    state.touchPoints.delete(event.pointerId);
+  }
+
+  if (getEffectiveInputMode() === "touch") {
+    onTouchPointerUp(event);
+    releaseBoardPointer(event.pointerId);
+    return;
+  }
+
+  if (!state.drag || !state.model) {
+    releaseBoardPointer(event.pointerId);
+    return;
+  }
+  if (state.drag.pointerId !== event.pointerId) {
+    releaseBoardPointer(event.pointerId);
+    return;
+  }
 
   const rect = state.drag.rect;
   state.drag = null;
+  applyPlacement(rect);
+  releaseBoardPointer(event.pointerId);
+}
+
+function onTouchPointerDown(event, r, c) {
+  if (state.touchPoints.size >= 2) {
+    beginTouchGesture();
+    return;
+  }
+  if (!canInteractBoard()) return;
+
+  cancelTouchState();
+  state.touchState = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    startR: r,
+    startC: c,
+    moved: false,
+    longPressTriggered: false,
+    longPressTimer: window.setTimeout(() => {
+      if (!state.touchState) return;
+      if (state.touchState.pointerId !== event.pointerId) return;
+      if (state.touchState.moved || state.touchGesture) return;
+      state.touchState.longPressTriggered = true;
+      state.touchAnchor = null;
+      if (!eraseAtCoordinates(r, c, false)) {
+        toast("Long press a filled rectangle to erase.");
+      }
+      renderBoard();
+    }, LONG_PRESS_MS)
+  };
+}
+
+function onTouchPointerMove(event) {
+  event.preventDefault();
+
+  if (state.touchGesture && state.touchPoints.size >= 2) {
+    handleTouchGestureMove();
+    return;
+  }
+
+  if (!state.touchState || state.touchState.pointerId !== event.pointerId) return;
+  const dx = event.clientX - state.touchState.startX;
+  const dy = event.clientY - state.touchState.startY;
+  const distance = Math.hypot(dx, dy);
+
+  if (distance > TAP_MOVE_TOLERANCE_PX) {
+    state.touchState.moved = true;
+  }
+  if (distance > LONG_PRESS_MOVE_TOLERANCE_PX) {
+    clearTouchLongPressTimer();
+  }
+}
+
+function onTouchPointerUp(event) {
+  const hadGesture = Boolean(state.touchGesture);
+  if (state.touchPoints.size < 2) {
+    state.touchGesture = null;
+  }
+
+  if (!state.touchState || state.touchState.pointerId !== event.pointerId) return;
+
+  const interaction = state.touchState;
+  cancelTouchState();
+  if (hadGesture || interaction.moved || interaction.longPressTriggered) return;
+
+  const cell = getCellFromPointerEvent(event);
+  const r = cell ? Number(cell.dataset.r) : interaction.startR;
+  const c = cell ? Number(cell.dataset.c) : interaction.startC;
+  handleTouchTap(r, c);
+}
+
+function handleTouchTap(r, c) {
+  if (!state.model) return;
+  if (!canInteractBoard()) return;
+
+  if (state.eraseMode) {
+    eraseAtCoordinates(r, c);
+    state.touchLastTap = null;
+    state.touchAnchor = null;
+    return;
+  }
+
+  const hasPlacement = Boolean(state.model.occupancy[r]?.[c]);
+  const now = Date.now();
+  const isDoubleTap =
+    !state.touchAnchor &&
+    hasPlacement &&
+    state.touchLastTap &&
+    now - state.touchLastTap.time <= DOUBLE_TAP_WINDOW_MS &&
+    state.touchLastTap.r === r &&
+    state.touchLastTap.c === c;
+
+  if (isDoubleTap) {
+    eraseAtCoordinates(r, c);
+    state.touchLastTap = null;
+    state.touchAnchor = null;
+    return;
+  }
+
+  state.touchLastTap = { r, c, time: now };
+  if (!state.touchAnchor) {
+    state.touchAnchor = { r, c };
+    dom.puzzleNote.textContent = `Start corner selected (${r + 1}, ${c + 1}).`;
+    renderBoard();
+    return;
+  }
+
+  if (state.touchAnchor.r === r && state.touchAnchor.c === c) {
+    state.touchAnchor = null;
+    dom.puzzleNote.textContent = "Selection cleared.";
+    renderBoard();
+    return;
+  }
+
+  const rect = rectFromPoints(state.touchAnchor.r, state.touchAnchor.c, r, c);
+  state.touchAnchor = null;
+  applyPlacement(rect);
+}
+
+function beginTouchGesture() {
+  const metrics = getTouchMetrics();
+  if (!metrics) return;
+
+  cancelTouchState();
+  state.touchAnchor = null;
+  state.drag = null;
+  state.touchGesture = {
+    prevCenter: metrics.center,
+    prevDistance: Math.max(metrics.distance, 1)
+  };
+  renderBoard();
+}
+
+function handleTouchGestureMove() {
+  const metrics = getTouchMetrics();
+  if (!metrics || !state.touchGesture) return;
+
+  const wrap = dom.boardWrap;
+  const oldZoom = state.boardZoom;
+  const zoomFactor = metrics.distance / Math.max(state.touchGesture.prevDistance, 1);
+  const nextZoom = Math.max(1, Math.min(MAX_TOUCH_ZOOM, oldZoom * zoomFactor));
+
+  if (Math.abs(nextZoom - oldZoom) > 0.001) {
+    const contentX = wrap.scrollLeft + metrics.center.x;
+    const contentY = wrap.scrollTop + metrics.center.y;
+    state.boardZoom = nextZoom;
+    applyBoardCellSize();
+    const scale = nextZoom / oldZoom;
+    wrap.scrollLeft = contentX * scale - metrics.center.x;
+    wrap.scrollTop = contentY * scale - metrics.center.y;
+  }
+
+  if (state.boardZoom > 1.01) {
+    const deltaX = metrics.center.x - state.touchGesture.prevCenter.x;
+    const deltaY = metrics.center.y - state.touchGesture.prevCenter.y;
+    wrap.scrollLeft -= deltaX;
+    wrap.scrollTop -= deltaY;
+  }
+
+  state.touchGesture.prevCenter = metrics.center;
+  state.touchGesture.prevDistance = Math.max(metrics.distance, 1);
+}
+
+function getTouchMetrics() {
+  if (state.touchPoints.size < 2) return null;
+  const points = Array.from(state.touchPoints.values()).slice(0, 2);
+  const [p1, p2] = points;
+  const bounds = dom.boardWrap.getBoundingClientRect();
+  const localP1 = { x: p1.x - bounds.left, y: p1.y - bounds.top };
+  const localP2 = { x: p2.x - bounds.left, y: p2.y - bounds.top };
+
+  return {
+    center: {
+      x: (localP1.x + localP2.x) / 2,
+      y: (localP1.y + localP2.y) / 2
+    },
+    distance: Math.hypot(localP2.x - localP1.x, localP2.y - localP1.y)
+  };
+}
+
+function clearTouchLongPressTimer() {
+  if (!state.touchState?.longPressTimer) return;
+  clearTimeout(state.touchState.longPressTimer);
+  state.touchState.longPressTimer = null;
+}
+
+function cancelTouchState() {
+  clearTouchLongPressTimer();
+  state.touchState = null;
+}
+
+function captureBoardPointer(pointerId) {
+  if (!dom.board.setPointerCapture) return;
+  try {
+    dom.board.setPointerCapture(pointerId);
+  } catch {
+    // Pointer capture may fail on some browser/device combinations.
+  }
+}
+
+function releaseBoardPointer(pointerId) {
+  if (!dom.board.releasePointerCapture || !dom.board.hasPointerCapture) return;
+  if (!dom.board.hasPointerCapture(pointerId)) return;
+  try {
+    dom.board.releasePointerCapture(pointerId);
+  } catch {
+    // Ignore release failures.
+  }
+}
+
+function getCellFromPointerEvent(event) {
+  if (event.target instanceof Element) {
+    const direct = event.target.closest(".cell");
+    if (direct) return direct;
+  }
+  const hit = document.elementFromPoint(event.clientX, event.clientY);
+  if (!(hit instanceof Element)) return null;
+  return hit.closest(".cell");
+}
+
+function canInteractBoard() {
+  if (!state.model) return false;
+  if (!state.started) {
+    if (!state.boardLockedToastShown) {
+      toast("Press here to begin.");
+      state.boardLockedToastShown = true;
+    }
+    return false;
+  }
+  if (state.paused) {
+    toast("Puzzle is paused. Press Resume.");
+    return false;
+  }
+  if (state.model.solved) return false;
+  return true;
+}
+
+function applyPlacement(rect) {
+  if (!state.model) return;
   const result = placeRectangle(state.model, rect);
   if (!result.ok) {
     toast(result.reason, "error");
@@ -617,29 +1015,29 @@ function onGlobalMouseUp() {
   }
 }
 
-function onBoardContextMenu(event) {
-  event.preventDefault();
-  const cell = event.target.closest(".cell");
-  if (!cell || !state.model) return;
-
-  if (!state.started) {
-    toast("Press here to begin.");
-    return;
-  }
-  if (state.paused) {
-    toast("Puzzle is paused. Press Resume.");
-    return;
-  }
-
-  const r = Number(cell.dataset.r);
-  const c = Number(cell.dataset.c);
+function eraseAtCoordinates(r, c, toastOnFailure = true) {
+  if (!state.model) return false;
   const result = eraseRectangleAt(state.model, r, c);
   if (!result.ok) {
-    toast(result.reason);
-    return;
+    if (toastOnFailure) {
+      toast(result.reason);
+    }
+    return false;
   }
 
   postBoardMutation();
+  return true;
+}
+
+function onBoardContextMenu(event) {
+  event.preventDefault();
+  const cell = getCellFromPointerEvent(event);
+  if (!cell || !state.model) return;
+  if (!canMutateBoard()) return;
+
+  const r = Number(cell.dataset.r);
+  const c = Number(cell.dataset.c);
+  eraseAtCoordinates(r, c);
 }
 
 function postBoardMutation(note = "") {
@@ -810,6 +1208,7 @@ function canMutateBoard() {
 }
 
 function onWindowResize() {
+  syncPuzzleLeaderboardPanel();
   if (!state.model) return;
   if (!dom.screens.puzzle.classList.contains("active")) return;
   buildBoard();
@@ -826,8 +1225,9 @@ function buildBoard() {
 
   const playAreaWidth = dom.puzzlePlayArea?.clientWidth || window.innerWidth;
   const availableWidth = Math.max(220, Math.min(playAreaWidth - 20, 860));
-  const cellSize = Math.max(18, Math.floor(availableWidth / size));
-  dom.board.style.setProperty("--cell-size", `${cellSize}px`);
+  const minCellSize = getEffectiveInputMode() === "touch" ? 26 : 18;
+  state.baseCellSize = Math.max(minCellSize, Math.floor(availableWidth / size));
+  applyBoardCellSize();
 
   state.cellEls = Array.from({ length: size }, () => Array(size));
 
@@ -842,6 +1242,13 @@ function buildBoard() {
       state.cellEls[r][c] = cell;
     }
   }
+}
+
+function applyBoardCellSize() {
+  const clampedZoom = Math.max(1, Math.min(MAX_TOUCH_ZOOM, state.boardZoom));
+  state.boardZoom = clampedZoom;
+  const pixelSize = Math.max(18, Math.round(state.baseCellSize * clampedZoom));
+  dom.board.style.setProperty("--cell-size", `${pixelSize}px`);
 }
 
 function renderBoard() {
@@ -889,7 +1296,9 @@ function renderBoard() {
       }
 
       const inDraft = Boolean(state.drag?.rect) && inRect(state.drag.rect, r, c);
+      const isTouchAnchor = Boolean(state.touchAnchor) && state.touchAnchor.r === r && state.touchAnchor.c === c;
       cell.classList.toggle("draft", inDraft);
+      cell.classList.toggle("touch-anchor", isTouchAnchor);
     }
   }
 
@@ -909,11 +1318,13 @@ function updateDragSizeIndicator() {
   const rows = r2 - r1 + 1;
   const cols = c2 - c1 + 1;
   const cellSize = Number.parseFloat(getComputedStyle(dom.board).getPropertyValue("--cell-size")) || 28;
+  const offsetX = dom.boardWrap.scrollLeft;
+  const offsetY = dom.boardWrap.scrollTop;
 
   dom.dragSizeIndicator.hidden = false;
   dom.dragSizeIndicator.textContent = `${rows}x${cols}`;
-  dom.dragSizeIndicator.style.left = `${((c1 + c2 + 1) * cellSize) / 2}px`;
-  dom.dragSizeIndicator.style.top = `${((r1 + r2 + 1) * cellSize) / 2}px`;
+  dom.dragSizeIndicator.style.left = `${((c1 + c2 + 1) * cellSize) / 2 - offsetX}px`;
+  dom.dragSizeIndicator.style.top = `${((r1 + r2 + 1) * cellSize) / 2 - offsetY}px`;
 }
 
 function colorForPlacement(colorId) {

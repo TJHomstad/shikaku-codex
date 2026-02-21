@@ -105,6 +105,14 @@
             <span id="meta-size">-</span>
             <span id="meta-level">-</span>
             <span id="timer-display" class="timer">00:00.000</span>
+            <label class="input-mode-control" for="input-mode-select">
+              Input
+              <select id="input-mode-select">
+                <option value="auto">Auto</option>
+                <option value="mouse">Mouse</option>
+                <option value="touch">Touch</option>
+              </select>
+            </label>
           </div>
         </div>
 
@@ -130,7 +138,11 @@
             </div>
           </div>
 
-          <aside class="scoreboard puzzle-scoreboard" aria-labelledby="puzzle-high-scores-title">
+          <button id="puzzle-leaderboard-toggle" class="leaderboard-toggle" type="button" hidden>
+            Show Leaderboard
+          </button>
+
+          <aside id="puzzle-scoreboard" class="scoreboard puzzle-scoreboard" aria-labelledby="puzzle-high-scores-title">
             <h3 id="puzzle-high-scores-title">Level Leaderboard</h3>
             <p id="puzzle-leaderboard-meta" class="score-meta"></p>
             <ol id="puzzle-leaderboard" class="score-list"></ol>

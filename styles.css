@@ -264,12 +264,31 @@ button:disabled {
   gap: 0.65rem;
   flex-wrap: wrap;
   color: var(--muted);
+  align-items: center;
 }
 
 .timer {
   font-variant-numeric: tabular-nums;
   color: var(--ink);
   font-weight: 700;
+}
+
+.input-mode-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.input-mode-control select {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.2rem 0.4rem;
+  font-size: 0.82rem;
+  font-family: inherit;
 }
 
 .puzzle-layout {
@@ -287,11 +306,15 @@ button:disabled {
 .board-wrap {
   margin-top: 0.8rem;
   position: relative;
-  display: inline-block;
+  display: block;
+  width: min(100%, 860px);
+  max-width: 100%;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: #fff;
-  overflow: hidden;
+  overflow: auto;
+  touch-action: none;
+  overscroll-behavior: contain;
 }
 
 .board {
@@ -332,6 +355,10 @@ button:disabled {
 
 .cell.draft {
   box-shadow: inset 0 0 0 2px rgba(64, 99, 109, 0.55);
+}
+
+.cell.touch-anchor {
+  box-shadow: inset 0 0 0 3px rgba(64, 99, 109, 0.9);
 }
 
 .lock-overlay {
@@ -397,6 +424,10 @@ dialog {
 
 .puzzle-scoreboard {
   margin-top: 0;
+}
+
+.leaderboard-toggle {
+  display: none;
 }
 
 .score-entry {
@@ -486,5 +517,23 @@ dialog::backdrop {
 
   .puzzle-layout {
     grid-template-columns: 1fr;
+  }
+
+  .leaderboard-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+  }
+
+  .board-wrap {
+    max-height: 70vh;
+  }
+
+  .action-row button,
+  .action-row .inline-link {
+    min-height: 42px;
+    font-size: 1rem;
+    padding: 0.65rem 0.95rem;
   }
 }
