@@ -249,8 +249,9 @@ button:disabled {
 }
 
 .level-tile {
-  text-align: left;
+  text-align: center;
   display: grid;
+  justify-items: center;
   gap: 0.2rem;
 }
 
@@ -260,11 +261,17 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  justify-content: center;
   gap: 0.25rem;
+  text-align: center;
 }
 
 .level-meta-world-record {
   color: #9f2f2f;
+}
+
+.level-meta-world-record.unplayed {
+  color: var(--muted);
 }
 
 .puzzle-topbar {

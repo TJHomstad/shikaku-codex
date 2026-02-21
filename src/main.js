@@ -78,7 +78,7 @@ const dom = {
 };
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
-const APP_VERSION = "0.67.23";
+const APP_VERSION = "0.67.24";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -469,8 +469,9 @@ function renderLevelsScreen() {
     meta.className = "level-meta";
 
     const storageId = puzzleStorageId(selectedDifficulty, selectedSize, level);
+    const hasBeenPlayed = loadTimes(storageId).length > 0 || Boolean(loadProgress(storageId));
     meta.dataset.levelKey = storageId;
-    renderLevelMeta(meta, null, true);
+    renderLevelMeta(meta, null, true, hasBeenPlayed);
     button.append(meta);
 
     const availableLevel = available.includes(level);
@@ -478,7 +479,7 @@ function renderLevelsScreen() {
       button.disabled = true;
       meta.textContent = "Unavailable in catalog";
     } else {
-      void hydrateLevelGlobalBest(storageId, meta, renderId);
+      void hydrateLevelGlobalBest(storageId, meta, renderId, hasBeenPlayed);
     }
 
     button.addEventListener("click", () => {
@@ -490,7 +491,7 @@ function renderLevelsScreen() {
   }
 }
 
-function renderLevelMeta(target, worldRecordMs, loadingWorldRecord = false) {
+function renderLevelMeta(target, worldRecordMs, loadingWorldRecord = false, hasBeenPlayed = false) {
   const label = loadingWorldRecord
     ? "World Record ..."
     : Number.isFinite(worldRecordMs)
@@ -499,17 +500,20 @@ function renderLevelMeta(target, worldRecordMs, loadingWorldRecord = false) {
 
   const worldRecord = document.createElement("span");
   worldRecord.className = "level-meta-world-record";
+  if (!hasBeenPlayed) {
+    worldRecord.classList.add("unplayed");
+  }
   worldRecord.textContent = label;
 
   target.replaceChildren(worldRecord);
 }
 
-async function hydrateLevelGlobalBest(levelKey, metaNode, renderId) {
+async function hydrateLevelGlobalBest(levelKey, metaNode, renderId, hasBeenPlayed) {
   const globalBestMs = await getLevelGlobalBest(levelKey);
   if (renderId !== state.levelsRenderId) return;
   if (!metaNode.isConnected) return;
   if (metaNode.dataset.levelKey !== levelKey) return;
-  renderLevelMeta(metaNode, globalBestMs, false);
+  renderLevelMeta(metaNode, globalBestMs, false, hasBeenPlayed);
 }
 
 async function getLevelGlobalBest(levelKey) {
