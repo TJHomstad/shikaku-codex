@@ -17,30 +17,27 @@
 
     <main class="shell">
       <section id="home-screen" class="screen active" aria-labelledby="home-title">
-        <h1 id="home-title">Shikaku</h1>
-        <p class="home-subtitle">Partition the grid into rectangles</p>
+        <h1 id="home-title">Play Shikaku</h1>
+        <p class="lead">Partition the board into rectangles that match each clue number.</p>
 
-        <div class="home-section">
-          <span class="section-label">Difficulty</span>
-          <div id="difficulty-options" class="option-grid"></div>
+        <div class="panel-grid">
+          <section class="panel" aria-labelledby="difficulty-title">
+            <h2 id="difficulty-title">Difficulty</h2>
+            <div id="difficulty-options" class="option-grid"></div>
+          </section>
+
+          <section class="panel" aria-labelledby="size-title">
+            <h2 id="size-title">Board Size</h2>
+            <div id="size-options" class="option-grid"></div>
+          </section>
         </div>
 
-        <div class="home-section">
-          <span class="section-label">Board Size</span>
-          <div id="size-options" class="option-grid"></div>
-        </div>
-
-        <div class="home-actions">
-          <button id="select-level-btn" class="primary cta">Select Level</button>
-          <button id="random-level-btn" class="cta">Random Level</button>
-          <button id="continue-btn" class="cta" hidden>Continue</button>
+        <div class="action-row">
+          <button id="select-level-btn" class="primary">Select Level</button>
+          <button id="random-level-btn">Random Level</button>
+          <button id="continue-btn" hidden>Continue</button>
         </div>
         <p id="home-note" class="note"></p>
-
-        <nav class="home-links">
-          <a href="how-to-play.html">How to Play</a>
-          <a href="privacy.html">Privacy</a>
-        </nav>
       </section>
 
       <section id="levels-screen" class="screen" aria-labelledby="levels-title">

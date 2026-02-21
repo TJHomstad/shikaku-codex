@@ -89,118 +89,27 @@ nav a {
   display: block;
 }
 
-/* ── Home screen ── */
-
-#home-screen {
-  background: none;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 0;
-  display: none;
-  flex-direction: column;
-  align-items: center;
-  min-height: calc(100vh - 4rem);
-  justify-content: center;
-}
-
-#home-screen.active {
-  display: flex;
-}
-
-body:has(#home-screen.active) .site-header,
-body:has(#home-screen.active) .site-footer {
-  display: none;
-}
-
-#home-screen #home-title {
-  font-size: clamp(2.5rem, 6vw, 3.8rem);
-  font-weight: 300;
-  letter-spacing: 0.12em;
-  color: var(--ink);
-}
-
-.home-subtitle {
-  margin-top: 0.85rem;
-  font-size: 1.08rem;
-  color: var(--muted);
-  letter-spacing: 0.01em;
-}
-
-.home-section {
-  margin-top: 2.2rem;
-  width: 100%;
-  max-width: 600px;
-}
-
-.home-section .option-grid {
-  justify-content: center;
-}
-
-.section-label {
-  display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 0.65rem;
-  text-align: center;
-}
-
-#home-screen .option-grid button {
-  padding: 0.6rem 1.15rem;
-  border-radius: 10px;
-  font-size: 0.95rem;
-  min-width: 5.5rem;
-  text-align: center;
-  justify-content: center;
-}
-
-.home-actions {
-  margin-top: 2.5rem;
-  display: flex;
-  justify-content: center;
-  gap: 0.85rem;
-}
-
-button.cta {
-  font-size: 1.05rem;
-  padding: 0.75rem 2.5rem;
-  border-radius: 12px;
-  min-width: 10.5rem;
-}
-
-.home-links {
-  margin-top: 2rem;
-  display: flex;
-  gap: 2rem;
-  justify-content: center;
-}
-
-.home-links a {
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 0.95rem;
-  color: var(--accent);
-}
-
-.home-links a:hover {
-  text-decoration: underline;
-}
-
-#home-screen .note {
-  text-align: center;
-  font-size: 0.85rem;
-  margin-top: 1rem;
-}
-
 .lead {
   margin-top: 0.5rem;
   color: var(--muted);
 }
 
+.panel-grid {
+  margin-top: 1.5rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.panel {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 1rem;
+  background: #fff;
+}
+
 .option-grid {
+  margin-top: 0.75rem;
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
@@ -217,7 +126,6 @@ button,
   padding: 0.55rem 0.9rem;
   cursor: pointer;
   text-decoration: none;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
 }
 
 button:hover,
@@ -227,8 +135,7 @@ button:hover,
 
 button.active {
   border-color: var(--accent);
-  background: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
   font-weight: 600;
 }
 
@@ -237,10 +144,6 @@ button.primary {
   background: var(--accent);
   color: #fff;
   font-weight: 600;
-}
-
-button.cta:hover {
-  box-shadow: 0 2px 8px rgba(43, 43, 43, 0.1);
 }
 
 button:disabled {
@@ -438,6 +341,10 @@ dialog::backdrop {
 }
 
 @media (max-width: 900px) {
+  .panel-grid {
+    grid-template-columns: 1fr;
+  }
+
   .site-header,
   .site-footer,
   .shell {
@@ -447,14 +354,5 @@ dialog::backdrop {
   .puzzle-topbar {
     flex-direction: column;
     align-items: flex-start;
-  }
-
-  #home-screen {
-    min-height: auto;
-    padding: 3rem 1rem 2rem;
-  }
-
-  .home-section {
-    max-width: 100%;
   }
 }
