@@ -81,7 +81,7 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.36";
+const APP_VERSION = "0.67.37";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -645,34 +645,53 @@ function renderLevelsScreen() {
   }
 }
 
-function renderLevelMeta(target, worldRecordMs, loadingWorldRecord = false, hasBeenPlayed = false) {
+function normalizeWorldRecord(value) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? { firstName: "Unknown", completionMs: value } : null;
+  }
+  if (!value || typeof value !== "object") return null;
+
+  const completionMs = Number(value.completionMs);
+  if (!Number.isFinite(completionMs)) return null;
+
+  return {
+    firstName:
+      typeof value.firstName === "string" && value.firstName.trim()
+        ? value.firstName.trim()
+        : "Unknown",
+    completionMs
+  };
+}
+
+function renderLevelMeta(target, worldRecord, loadingWorldRecord = false, hasBeenPlayed = false) {
+  const normalizedRecord = normalizeWorldRecord(worldRecord);
   const label = loadingWorldRecord
     ? "World Record ..."
-    : Number.isFinite(worldRecordMs)
-      ? `World Record ${formatMs(worldRecordMs)}`
+    : normalizedRecord
+      ? `World Record ${normalizedRecord.firstName} ${formatMs(normalizedRecord.completionMs)}`
       : "World Record -";
 
-  const worldRecord = document.createElement("span");
-  worldRecord.className = "level-meta-world-record";
+  const worldRecordEl = document.createElement("span");
+  worldRecordEl.className = "level-meta-world-record";
   if (!hasBeenPlayed) {
-    worldRecord.classList.add("unplayed");
+    worldRecordEl.classList.add("unplayed");
   }
-  worldRecord.textContent = label;
+  worldRecordEl.textContent = label;
 
-  target.replaceChildren(worldRecord);
+  target.replaceChildren(worldRecordEl);
 }
 
 async function hydrateLevelGlobalBest(levelKey, metaNode, renderId, hasBeenPlayed) {
-  const globalBestMs = await getLevelGlobalBest(levelKey);
+  const globalBest = await getLevelGlobalBest(levelKey);
   if (renderId !== state.levelsRenderId) return;
   if (!metaNode.isConnected) return;
   if (metaNode.dataset.levelKey !== levelKey) return;
-  renderLevelMeta(metaNode, globalBestMs, false, hasBeenPlayed);
+  renderLevelMeta(metaNode, globalBest, false, hasBeenPlayed);
 }
 
 async function getLevelGlobalBest(levelKey) {
   if (state.globalBestCache.has(levelKey)) {
-    return state.globalBestCache.get(levelKey);
+    return normalizeWorldRecord(state.globalBestCache.get(levelKey));
   }
   if (state.globalBestRequests.has(levelKey)) {
     return state.globalBestRequests.get(levelKey);
@@ -683,7 +702,12 @@ async function getLevelGlobalBest(levelKey) {
       const response = await getLeaderboard(levelKey, 1);
       const top = Array.isArray(response.leaderboard) ? response.leaderboard[0] : null;
       const completionMs = Number(top?.completionMs);
-      const best = Number.isFinite(completionMs) ? completionMs : null;
+      const best = Number.isFinite(completionMs)
+        ? {
+            firstName: typeof top?.firstName === "string" && top.firstName.trim() ? top.firstName.trim() : "Unknown",
+            completionMs
+          }
+        : null;
       state.globalBestCache.set(levelKey, best);
       return best;
     } catch {
@@ -701,7 +725,12 @@ function updateCachedGlobalBest(levelKey, leaderboard) {
   if (!levelKey) return;
   const top = Array.isArray(leaderboard) ? leaderboard[0] : null;
   const completionMs = Number(top?.completionMs);
-  const best = Number.isFinite(completionMs) ? completionMs : null;
+  const best = Number.isFinite(completionMs)
+    ? {
+        firstName: typeof top?.firstName === "string" && top.firstName.trim() ? top.firstName.trim() : "Unknown",
+        completionMs
+      }
+    : null;
   state.globalBestCache.set(levelKey, best);
 }
 
