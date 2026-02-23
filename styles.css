@@ -289,10 +289,17 @@ button:disabled {
 
 .level-meta-world-record {
   color: #9f2f2f;
+  display: grid;
+  justify-items: center;
+  line-height: 1.15;
 }
 
 .level-meta-world-record.unplayed {
   color: var(--muted);
+}
+
+.level-meta-world-record-time {
+  font-variant-numeric: tabular-nums;
 }
 
 .puzzle-topbar {

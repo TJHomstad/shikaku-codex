@@ -81,7 +81,7 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.37";
+const APP_VERSION = "0.67.38";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -665,18 +665,26 @@ function normalizeWorldRecord(value) {
 
 function renderLevelMeta(target, worldRecord, loadingWorldRecord = false, hasBeenPlayed = false) {
   const normalizedRecord = normalizeWorldRecord(worldRecord);
-  const label = loadingWorldRecord
-    ? "World Record ..."
-    : normalizedRecord
-      ? `World Record ${normalizedRecord.firstName} ${formatMs(normalizedRecord.completionMs)}`
-      : "World Record -";
+  const label = loadingWorldRecord ? "World Record ..." : "World Record -";
 
   const worldRecordEl = document.createElement("span");
   worldRecordEl.className = "level-meta-world-record";
   if (!hasBeenPlayed) {
     worldRecordEl.classList.add("unplayed");
   }
-  worldRecordEl.textContent = label;
+  if (normalizedRecord && !loadingWorldRecord) {
+    const recordLabel = document.createElement("span");
+    recordLabel.className = "level-meta-world-record-label";
+    recordLabel.textContent = `World Record ${normalizedRecord.firstName}`;
+
+    const recordTime = document.createElement("span");
+    recordTime.className = "level-meta-world-record-time";
+    recordTime.textContent = formatMs(normalizedRecord.completionMs);
+
+    worldRecordEl.replaceChildren(recordLabel, recordTime);
+  } else {
+    worldRecordEl.textContent = label;
+  }
 
   target.replaceChildren(worldRecordEl);
 }
