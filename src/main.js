@@ -81,7 +81,7 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.39";
+const APP_VERSION = "0.67.40";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -680,6 +680,7 @@ function renderLevelMeta(target, worldRecord, loadingWorldRecord = false, hasBee
   if (loadingWorldRecord) {
     recordDetail.className = "level-meta-world-record-detail";
     recordDetail.textContent = "...";
+    worldRecordEl.replaceChildren(recordLabel, recordDetail);
   } else if (normalizedRecord) {
     const user = document.createElement("span");
     user.className = "level-meta-world-record-user";
@@ -689,15 +690,12 @@ function renderLevelMeta(target, worldRecord, loadingWorldRecord = false, hasBee
     time.className = "level-meta-world-record-time";
     time.textContent = formatMs(normalizedRecord.completionMs);
 
-    recordLabel.append(" ", user);
-    recordDetail.className = "level-meta-world-record-detail";
-    recordDetail.append(time);
+    worldRecordEl.replaceChildren(recordLabel, user, time);
   } else {
     recordDetail.className = "level-meta-world-record-unclaimed";
     recordDetail.textContent = "unclaimed";
+    worldRecordEl.replaceChildren(recordLabel, recordDetail);
   }
-
-  worldRecordEl.replaceChildren(recordLabel, recordDetail);
 
   target.replaceChildren(worldRecordEl);
 }

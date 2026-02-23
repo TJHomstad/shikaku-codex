@@ -291,6 +291,7 @@ button:disabled {
   color: #9f2f2f;
   display: grid;
   justify-items: center;
+  gap: 0.06rem;
   line-height: 1.15;
 }
 
@@ -304,6 +305,7 @@ button:disabled {
 
 .level-meta-world-record-user {
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .level-meta-world-record-detail {
