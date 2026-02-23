@@ -81,7 +81,7 @@ const dom = {
 
 const GLOBAL_LEADERBOARD_LIMIT = 15;
 const HOME_LEADERBOARD_LIMIT = 5;
-const APP_VERSION = "0.67.38";
+const APP_VERSION = "0.67.39";
 const INPUT_MODE_STORAGE_KEY = "shikaku_input_mode";
 const MAX_TOUCH_ZOOM = 3;
 const TAP_MOVE_TOLERANCE_PX = 10;
@@ -665,26 +665,39 @@ function normalizeWorldRecord(value) {
 
 function renderLevelMeta(target, worldRecord, loadingWorldRecord = false, hasBeenPlayed = false) {
   const normalizedRecord = normalizeWorldRecord(worldRecord);
-  const label = loadingWorldRecord ? "World Record ..." : "World Record -";
-
   const worldRecordEl = document.createElement("span");
   worldRecordEl.className = "level-meta-world-record";
   if (!hasBeenPlayed) {
     worldRecordEl.classList.add("unplayed");
   }
-  if (normalizedRecord && !loadingWorldRecord) {
-    const recordLabel = document.createElement("span");
-    recordLabel.className = "level-meta-world-record-label";
-    recordLabel.textContent = `World Record ${normalizedRecord.firstName}`;
 
-    const recordTime = document.createElement("span");
-    recordTime.className = "level-meta-world-record-time";
-    recordTime.textContent = formatMs(normalizedRecord.completionMs);
+  const recordLabel = document.createElement("span");
+  recordLabel.className = "level-meta-world-record-label";
+  recordLabel.textContent = "World Record";
 
-    worldRecordEl.replaceChildren(recordLabel, recordTime);
+  const recordDetail = document.createElement("span");
+
+  if (loadingWorldRecord) {
+    recordDetail.className = "level-meta-world-record-detail";
+    recordDetail.textContent = "...";
+  } else if (normalizedRecord) {
+    const user = document.createElement("span");
+    user.className = "level-meta-world-record-user";
+    user.textContent = normalizedRecord.firstName;
+
+    const time = document.createElement("span");
+    time.className = "level-meta-world-record-time";
+    time.textContent = formatMs(normalizedRecord.completionMs);
+
+    recordLabel.append(" ", user);
+    recordDetail.className = "level-meta-world-record-detail";
+    recordDetail.append(time);
   } else {
-    worldRecordEl.textContent = label;
+    recordDetail.className = "level-meta-world-record-unclaimed";
+    recordDetail.textContent = "unclaimed";
   }
+
+  worldRecordEl.replaceChildren(recordLabel, recordDetail);
 
   target.replaceChildren(worldRecordEl);
 }

@@ -298,8 +298,24 @@ button:disabled {
   color: var(--muted);
 }
 
+.level-meta-world-record-label {
+  white-space: nowrap;
+}
+
+.level-meta-world-record-user {
+  font-weight: 700;
+}
+
+.level-meta-world-record-detail {
+  display: block;
+}
+
 .level-meta-world-record-time {
   font-variant-numeric: tabular-nums;
+}
+
+.level-meta-world-record-unclaimed {
+  color: var(--muted);
 }
 
 .puzzle-topbar {
